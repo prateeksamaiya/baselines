@@ -2,6 +2,7 @@ from collections import deque
 
 import numpy as np
 import pickle
+import rospy
 
 from baselines.her.util import convert_episode_to_batch_major, store_args
 
@@ -54,6 +55,9 @@ class RolloutWorker:
         """
         self.reset_all_rollouts()
 
+        # print("rollout_batch_size",self.rollout_batch_size)
+        # assert(False)
+
         # compute observations
         o = np.empty((self.rollout_batch_size, self.dims['o']), np.float32)  # observations
         ag = np.empty((self.rollout_batch_size, self.dims['g']), np.float32)  # achieved goals
@@ -66,6 +70,7 @@ class RolloutWorker:
         info_values = [np.empty((self.T - 1, self.rollout_batch_size, self.dims['info_' + key]), np.float32) for key in self.info_keys]
         Qs = []
         for t in range(self.T):
+            # start = rospy.get_rostime()
             policy_output = self.policy.get_actions(
                 o, ag, self.g,
                 compute_Q=self.compute_Q,
@@ -91,8 +96,15 @@ class RolloutWorker:
             o_new = obs_dict_new['observation']
             ag_new = obs_dict_new['achieved_goal']
             success = np.array([i.get('is_success', 0.0) for i in info])
+            # print(info)
+            # print(success)
+            # print("done",done)
+            # assert(False)
 
             if any(done):
+                if not t:
+                    self.reset_all_rollouts()
+                    return self.generate_rollouts()
                 # here we assume all environments are done is ~same number of steps, so we terminate rollouts whenever any of the envs returns done
                 # trick with using vecenvs is not to add the obs from the environments that are "done", because those are already observations
                 # after a reset
@@ -107,6 +119,8 @@ class RolloutWorker:
                 self.reset_all_rollouts()
                 return self.generate_rollouts()
 
+            # print("time_per_step",rospy.get_rostime() - start)
+
             dones.append(done)
             obs.append(o.copy())
             achieved_goals.append(ag.copy())
@@ -115,6 +129,8 @@ class RolloutWorker:
             goals.append(self.g.copy())
             o[...] = o_new
             ag[...] = ag_new
+
+
         obs.append(o.copy())
         achieved_goals.append(ag.copy())
 
@@ -122,10 +138,12 @@ class RolloutWorker:
                        u=acts,
                        g=goals,
                        ag=achieved_goals)
+
         for key, value in zip(self.info_keys, info_values):
-            episode['info_{}'.format(key)] = value
+            episode['info_{}'.format(key)] = value[:t]
 
         # stats
+        # print(len(successes))
         successful = np.array(successes)[-1, :]
         assert successful.shape == (self.rollout_batch_size,)
         success_rate = np.mean(successful)

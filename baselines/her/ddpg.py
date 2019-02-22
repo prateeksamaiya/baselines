@@ -227,7 +227,8 @@ class DDPG(object):
             episode_batch['o_2'] = episode_batch['o'][:, 1:, :]
             episode_batch['ag_2'] = episode_batch['ag'][:, 1:, :]
             num_normalizing_transitions = transitions_in_episode_batch(episode_batch)
-            transitions = self.sample_transitions(episode_batch, num_normalizing_transitions)
+            # print("num_normalizing_transitions",num_normalizing_transitions)
+            transitions = self.sample_transitions(episode_batch,self.T-1,num_normalizing_transitions)
 
             o, g, ag = transitions['o'], transitions['g'], transitions['ag']
             transitions['o'], transitions['g'] = self._preprocess_og(o, ag, g)
@@ -261,6 +262,7 @@ class DDPG(object):
         self.pi_adam.update(pi_grad, self.pi_lr)
 
     def sample_batch(self):
+
         if self.bc_loss: #use demonstration buffer to sample as well if bc_loss flag is set TRUE
             transitions = self.buffer.sample(self.batch_size - self.demo_batch_size)
             global DEMO_BUFFER

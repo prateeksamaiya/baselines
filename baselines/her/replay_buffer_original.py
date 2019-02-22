@@ -19,15 +19,10 @@ class ReplayBuffer:
         self.T = T
         self.sample_transitions = sample_transitions
 
-        print("buffer_shapes",buffer_shapes)
-        print("size in transition",size_in_transitions)
-        print("T",T)
-        
-        
 
         # self.buffers is {key: array(size_in_episodes x T or T+1 x dim_key)}
-        # self.buffers is {key: array(size_in_episodes x T or T+1 x dim_key)}
-        self.buffers = {key: [] for key,_ in buffer_shapes.items()}
+        self.buffers = {key: np.empty([self.size, *shape])
+                        for key, shape in buffer_shapes.items()}
 
         # memory management
         self.current_size = 0
@@ -48,14 +43,14 @@ class ReplayBuffer:
         with self.lock:
             assert self.current_size > 0
             for key in self.buffers.keys():
-                buffers[key] = (self.buffers[key][:self.current_size][0])
+                buffers[key] = self.buffers[key][:self.current_size]
 
+        print(buffers['o'].shape)
 
-        buffers['o_2'] = [ x[1:] for x in buffers['o']]
-        buffers['ag_2'] = [ x[1:] for x in buffers['ag']]
-        
+        buffers['o_2'] = buffers['o'][:, 1:, :]
+        buffers['ag_2'] = buffers['ag'][:, 1:, :]
 
-        transitions = self.sample_transitions(buffers,self.T-1,batch_size)
+        transitions = self.sample_transitions(buffers, batch_size)
 
         for key in (['r', 'o_2', 'ag_2'] + list(self.buffers.keys())):
             assert key in transitions, "key %s missing from transitions" % key
@@ -66,6 +61,7 @@ class ReplayBuffer:
         """episode_batch: array(batch_size x (T or T+1) x dim_key)
         """
         batch_sizes = [len(episode_batch[key]) for key in episode_batch.keys()]
+    
 
         assert np.all(np.array(batch_sizes) == batch_sizes[0])
         batch_size = batch_sizes[0]
@@ -73,16 +69,11 @@ class ReplayBuffer:
         with self.lock:
             idxs = self._get_storage_idx(batch_size)
 
-            
-
             # load inputs into buffers
             for key in self.buffers.keys():
-                # print(key,episode_batch[key].shape)
-                for idx in idxs:
-                    if idx >=len(self.buffers[key]):
-                        self.buffers[key].append(episode_batch[key])
-                    else:
-                        self.buffers[key][idx] = episode_batch[key]
+                temp = self.buffers[key].tolist()
+                temp[idxs] = episode_batch[key]
+                self.buffers[key] = np.array(temp)
 
             self.n_transitions_stored += batch_size * self.T
 
@@ -119,6 +110,6 @@ class ReplayBuffer:
         # update replay size
         self.current_size = min(self.size, self.current_size+inc)
 
-        # if inc == 1:
-        #     idx = idx[0]
+        if inc == 1:
+            idx = idx[0]
         return idx

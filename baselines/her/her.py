@@ -40,7 +40,9 @@ def train(*, policy, rollout_worker, evaluator,
         rollout_worker.clear_history()
         for _ in range(n_cycles):
             episode = rollout_worker.generate_rollouts()
+            # print("checkpoint 1")
             policy.store_episode(episode)
+            # print("checkpoint 2")
             for _ in range(n_batches):
                 policy.train()
             policy.update_target_net()
