@@ -30,11 +30,6 @@ def make_sample_her_transitions(replay_strategy, replay_k, reward_fun):
 
         batch_size = batch_size_in_transitions
 
-        # for key in episode_batch.keys():
-        #     print(key,len(episode_batch[key][0]))
-
-        transitions = {key:[] for key in episode_batch.keys()}
-
 
         # print("rollout_batch_size",rollout_batch_size)
         # print("batch_size",batch_size)
@@ -44,24 +39,24 @@ def make_sample_her_transitions(replay_strategy, replay_k, reward_fun):
         t_samples = np.random.randint(T, size=batch_size)
 
 
+        epi_len = np.array([episode_batch['u'][x].shape[0] for x in episode_idxs])
 
-        # episode_len = [len(x) for x
+        t_samples = t_samples%epi_len
+
+        transitions = {}
+
         for key in episode_batch.keys():
-            for i in range(batch_size):
-                t_samples[i] = t_samples[i] % (len(episode_batch['u'][episode_idxs[i]]))
-                transitions[key].append(episode_batch[key][episode_idxs[i]][t_samples[i]])
+            transitions[key] = np.array([episode_batch[key][episode][sample] for episode,sample in zip(episode_idxs,t_samples)])
             
-        # print("epiepisode_idxs",episode_idxs)
-        # print("t_samples",t_samples)
-        # transitions = {key: episode_batch[key][episode_idxs][t_samples].copy()
-        #                for key in episode_batch.keys()}
+            
 
         # Select future time indexes proportional with probability future_p. These
         # will be used for HER replay by substituting in future goals.
         her_indexes = np.where(np.random.uniform(size=batch_size) < future_p)[0]
-        future_offset = np.random.uniform(size=batch_size) * (T - t_samples)
+        future_offset = np.random.uniform(size=batch_size) * (epi_len - t_samples)
         future_offset = future_offset.astype(int)
         future_t = (t_samples + 1 + future_offset)[her_indexes]
+
 
 
 
@@ -69,22 +64,11 @@ def make_sample_her_transitions(replay_strategy, replay_k, reward_fun):
         # HER transitions (as defined by her_indexes). For the other transitions,
         # keep the original goal.
 
-        for i in range(len(her_indexes)):
-            idx = episode_idxs[her_indexes[i]]
-            future_t[i] = future_t[i] % (len(episode_batch['ag'][idx]))
+        for i, idx in enumerate(episode_idxs[her_indexes]):
             transitions['g'][her_indexes[i]] = episode_batch['ag'][idx][future_t[i]]
 
 
-
-        for key in transitions.keys():
-            transitions[key] = np.array(transitions[key])
-
-        # print(transitions.keys())
-
-        # future_ag = episode_batch['ag'][episode_idxs[her_indexes]][future_t]
-        # transitions['g'][her_indexes] = future_ag
-
-        # Reconstruct info dictionary for reward  computation.
+       # Reconstruct info dictionary for reward  computation.
         info = {}
         for key, value in transitions.items():
             if key.startswith('info_'):
@@ -98,13 +82,7 @@ def make_sample_her_transitions(replay_strategy, replay_k, reward_fun):
         transitions = {k: transitions[k].reshape(batch_size, *transitions[k].shape[1:])
                        for k in transitions.keys()}
 
-         # extra -1 reward if the drone collides
-        for i in range(len(transitions['r'])):
-            if transitions['info_collision'][i][0]:
-                transitions['r'][i] = transitions['r'][i] - 1
-
         assert(transitions['u'].shape[0] == batch_size_in_transitions)
-
 
         return transitions
 

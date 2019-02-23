@@ -48,7 +48,7 @@ class ReplayBuffer:
         with self.lock:
             assert self.current_size > 0
             for key in self.buffers.keys():
-                buffers[key] = (self.buffers[key][:self.current_size][0])
+                buffers[key] = (self.buffers[key][:self.current_size])
 
 
         buffers['o_2'] = [ x[1:] for x in buffers['o']]
@@ -80,9 +80,9 @@ class ReplayBuffer:
                 # print(key,episode_batch[key].shape)
                 for idx in idxs:
                     if idx >=len(self.buffers[key]):
-                        self.buffers[key].append(episode_batch[key])
+                        self.buffers[key].append(episode_batch[key][0]) #Extra dimension removed
                     else:
-                        self.buffers[key][idx] = episode_batch[key]
+                        self.buffers[key][idx] = episode_batch[key][0]
 
             self.n_transitions_stored += batch_size * self.T
 
