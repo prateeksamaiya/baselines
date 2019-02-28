@@ -82,6 +82,10 @@ def make_sample_her_transitions(replay_strategy, replay_k, reward_fun):
         transitions = {k: transitions[k].reshape(batch_size, *transitions[k].shape[1:])
                        for k in transitions.keys()}
 
+        for i in range(transitions['r'].shape[0]):
+            if transitions['info_collision'][i][0]:
+                transitions['r'][i] = transitions['r'][i] - 1
+
         assert(transitions['u'].shape[0] == batch_size_in_transitions)
 
         return transitions
