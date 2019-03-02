@@ -19,9 +19,9 @@ class ReplayBuffer:
         self.T = T
         self.sample_transitions = sample_transitions
 
-        print("buffer_shapes",buffer_shapes)
-        print("size in transition",size_in_transitions)
-        print("T",T)
+        # print("buffer_shapes",buffer_shapes)
+        # print("size in transition",size_in_transitions)
+        # print("T",T)
         
         
 
