@@ -1,5 +1,5 @@
 from collections import deque
-
+import time
 import numpy as np
 import pickle
 
@@ -87,7 +87,9 @@ class RolloutWorker:
             ag_new = np.empty((self.rollout_batch_size, self.dims['g']))
             success = np.zeros(self.rollout_batch_size)
             # compute new states and observations
+            # start_time = time.time()
             obs_dict_new, _, done, info = self.venv.step(u)
+            # print("step_time--- %s seconds ---" % (time.time() - start_time))
             o_new = obs_dict_new['observation']
             ag_new = obs_dict_new['achieved_goal']
             success = np.array([i.get('is_success', 0.0) for i in info])
