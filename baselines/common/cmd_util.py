@@ -145,6 +145,10 @@ def common_arg_parser():
     parser.add_argument('--save_video_interval', help='Save video every x steps (0 = disabled)', default=0, type=int)
     parser.add_argument('--save_video_length', help='Length of recorded video. Default: 200', default=200, type=int)
     parser.add_argument('--log_dir', default='/tmp/',type=str)
+    parser.add_argument('--world', default="basic_with_target",type=str)
+    parser.add_argument('--mav', default="bebop2",type=str)
+    parser.add_argument('--gui', default="false",type=str)
+    parser.add_argument('--launch', default="rpyt",type=str)
     parser.add_argument('--play', default=False, action='store_true')
     parser.add_argument('--extra_import', help='Extra module to import to access external environments', type=str, default=None)
     return parser
