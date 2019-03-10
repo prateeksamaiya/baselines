@@ -83,8 +83,13 @@ def make_sample_her_transitions(replay_strategy, replay_k, reward_fun):
                        for k in transitions.keys()}
 
         for i in range(transitions['r'].shape[0]):
+
+            if transitions['info_targetreached'][i][0]:
+                transitions['r'][i] = 0
+
             if transitions['info_collision'][i][0]:
                 transitions['r'][i] = transitions['r'][i] - 1
+
 
         assert(transitions['u'].shape[0] == batch_size_in_transitions)
 
