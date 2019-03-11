@@ -375,6 +375,7 @@ def configure(dir=None, format_strs=None):
     Logger.CURRENT = Logger(dir=dir, output_formats=output_formats)
     log('Logging to %s'%dir)
 
+
 def _configure_default_logger():
     format_strs = None
     # keep the old default of only writing to stdout
