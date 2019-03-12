@@ -34,6 +34,9 @@ def train(*, policy, rollout_worker, evaluator,
 
     if policy.bc_loss == 1: policy.init_demo_buffer(demo_file) #initialize demo buffer if training with demonstrations
 
+    # print(rank,policy_save_interval,n_epochs,policy_save_interval,save_path)
+
+
     # num_timesteps = n_epochs * n_cycles * rollout_length * number of rollout workers
     for epoch in range(n_epochs):
         # train
