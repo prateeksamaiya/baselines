@@ -55,7 +55,7 @@ class ReplayBuffer:
         buffers['ag_2'] = [ x[1:] for x in buffers['ag']]
         
 
-        transitions = self.sample_transitions(buffers,self.T-1,batch_size)
+        transitions = self.sample_transitions(buffers,batch_size)
 
         for key in (['r', 'o_2', 'ag_2'] + list(self.buffers.keys())):
             assert key in transitions, "key %s missing from transitions" % key
@@ -73,8 +73,6 @@ class ReplayBuffer:
         with self.lock:
             idxs = self._get_storage_idx(batch_size)
 
-            
-
             # load inputs into buffers
             for key in self.buffers.keys():
                 # print(key,episode_batch[key].shape)
@@ -84,7 +82,8 @@ class ReplayBuffer:
                     else:
                         self.buffers[key][idx] = episode_batch[key][0]
 
-            self.n_transitions_stored += batch_size * self.T
+            self.n_transitions_stored += batch_size * episode_batch['u'].shape[0]
+            # self.n_transitions_stored += batch_size * self.T
 
     def get_current_episode_size(self):
         with self.lock:

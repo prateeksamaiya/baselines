@@ -16,7 +16,7 @@ def make_sample_her_transitions(replay_strategy, replay_k, reward_fun):
     else:  # 'replay_strategy' == 'none'
         future_p = 0
 
-    def _sample_her_transitions(episode_batch,max_episode_len,batch_size_in_transitions):
+    def _sample_her_transitions(episode_batch,batch_size_in_transitions):
         """episode_batch is {key: array(buffer_size x T x dim_key)}
         """
         # print(episode_batch.keys())
@@ -26,8 +26,6 @@ def make_sample_her_transitions(replay_strategy, replay_k, reward_fun):
 
         rollout_batch_size = len(episode_batch['u'])
 
-        T = max_episode_len
-
         batch_size = batch_size_in_transitions
 
 
@@ -36,12 +34,13 @@ def make_sample_her_transitions(replay_strategy, replay_k, reward_fun):
         # print("T",T)
         # Select which episodes and time steps to use.
         episode_idxs = np.random.randint(0, rollout_batch_size, batch_size)
-        t_samples = np.random.randint(T, size=batch_size)
-
+        # t_samples = np.random.randint(T, size=batch_size)
 
         epi_len = np.array([episode_batch['u'][x].shape[0] for x in episode_idxs])
 
-        t_samples = t_samples%epi_len
+        t_samples = np.random.uniform(0,epi_len,batch_size).astype(int)
+
+        # t_samples = t_samples%epi_len
 
         transitions = {}
 
@@ -84,7 +83,7 @@ def make_sample_her_transitions(replay_strategy, replay_k, reward_fun):
 
         for i in range(transitions['r'].shape[0]):
 
-            if transitions['info_targetreached'][i][0]:
+            if transitions['info_is_success'][i][0]:
                 transitions['r'][i] = 0
 
             if transitions['info_collision'][i][0]:

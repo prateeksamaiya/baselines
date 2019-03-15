@@ -133,7 +133,7 @@ def common_arg_parser():
     Create an argparse.ArgumentParser for run_mujoco.py.
     """
     parser = arg_parser()
-    parser.add_argument('--env', help='environment ID', type=str, default='Reacher-v2')
+    parser.add_argument('--env', help='--env=RPYT or Postion or MotorSpeed default:RPYT', type=str, default='RPYT')
     parser.add_argument('--seed', help='RNG seed', type=int, default=None)
     parser.add_argument('--alg', help='Algorithm', type=str, default='ppo2')
     parser.add_argument('--num_timesteps', type=float, default=1e6),
@@ -141,14 +141,14 @@ def common_arg_parser():
     parser.add_argument('--gamestate', help='game state to load (so far only used in retro games)', default=None)
     parser.add_argument('--num_env', help='Number of environment copies being run in parallel. When not specified, set to number of cpus for Atari, and to 1 for Mujoco', default=None, type=int)
     parser.add_argument('--reward_scale', help='Reward scale factor. Default: 1.0', default=1.0, type=float)
-    parser.add_argument('--save_path', help='Path to save trained model to', default='~/policies/her/beboptest', type=str)
+    parser.add_argument('--save_path', help='Path to save trained model to', default=None, type=str)
     parser.add_argument('--save_video_interval', help='Save video every x steps (0 = disabled)', default=0, type=int)
     parser.add_argument('--save_video_length', help='Length of recorded video. Default: 200', default=200, type=int)
-    parser.add_argument('--log_dir', default=None,type=str)
-    parser.add_argument('--world', default="basic_with_target",type=str)
-    parser.add_argument('--mav', default="bebop2",type=str)
-    parser.add_argument('--gui', default="false",type=str)
-    parser.add_argument('--launch', default="rpyt",type=str)
+    parser.add_argument('--log_dir', default='/tmp/',type=str)
+    parser.add_argument('--world', default="basic_with_target",help='training or test environment name --world=pillar or basic with_target default: basic_with_target',type=str)
+    parser.add_argument('--mav', default="bebop2",help='drone_name --mav=bebop2 or firefly etc',type=str)
+    parser.add_argument('--gui', default="false",help='true or false --gui=true or false default value : false',type=str)
+    parser.add_argument('--launch', default="rpyt",help='controller name --launch=rpyt or motor_speed or position  default:rpyt',type=str)
     parser.add_argument('--play', default=False, action='store_true')
     parser.add_argument('--extra_import', help='Extra module to import to access external environments', type=str, default=None)
     return parser
