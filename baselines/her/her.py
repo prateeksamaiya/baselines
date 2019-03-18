@@ -3,6 +3,7 @@ import os
 import click
 import numpy as np
 import json
+import os.path as osp
 from mpi4py import MPI
 
 from baselines import logger
@@ -77,6 +78,11 @@ def train(*, policy, rollout_worker, evaluator,
             logger.info('Saving periodic policy to {} ...'.format(policy_path))
             evaluator.save_policy(policy_path)
 
+        if epoch%10==0 and rank == 0:
+            path = osp.expanduser(save_path)
+            policy.save(path+"/policy_"+str(epoch))
+
+
         # make sure that different threads have different seeds
         local_uniform = np.random.uniform(size=(1,))
         root_uniform = local_uniform.copy()
@@ -91,7 +97,7 @@ def learn(*, network, env, total_timesteps,
     seed=None,
     eval_env=None,
     replay_strategy='future',
-    policy_save_interval=5,
+    policy_save_interval=0,
     clip_return=True,
     demo_file=None,
     override_params=None,
