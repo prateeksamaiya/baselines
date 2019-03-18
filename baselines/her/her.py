@@ -6,6 +6,7 @@ import json
 from mpi4py import MPI
 
 from baselines import logger
+import os.path as osp
 from baselines.common import set_global_seeds, tf_util
 from baselines.common.mpi_moments import mpi_moments
 import baselines.her.experiment.config as config
@@ -23,6 +24,7 @@ def train(*, policy, rollout_worker, evaluator,
           n_epochs, n_test_rollouts, n_cycles, n_batches, policy_save_interval,
           save_path, demo_file, **kwargs):
     rank = MPI.COMM_WORLD.Get_rank()
+
 
     if save_path:
         latest_policy_path = os.path.join(save_path, 'policy_latest.pkl')
@@ -83,6 +85,10 @@ def train(*, policy, rollout_worker, evaluator,
         if rank != 0:
             assert local_uniform[0] != root_uniform[0]
 
+        if epoch%10==0 and rank == 0:
+            path = osp.expanduser(save_path)
+            policy.save(path+"/policy_"+str(epoch))
+
     return policy
 
 
@@ -90,7 +96,7 @@ def learn(*, network, env, total_timesteps,
     seed=None,
     eval_env=None,
     replay_strategy='future',
-    policy_save_interval=5,
+    policy_save_interval=0,
     clip_return=True,
     demo_file=None,
     override_params=None,
