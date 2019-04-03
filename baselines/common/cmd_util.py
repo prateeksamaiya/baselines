@@ -151,6 +151,7 @@ def common_arg_parser():
     parser.add_argument('--launch', default="rpyt",help='controller name --launch=rpyt or motor_speed or position  default:rpyt',type=str)
     parser.add_argument('--play', default=False, action='store_true')
     parser.add_argument('--extra_import', help='Extra module to import to access external environments', type=str, default=None)
+    parser.add_argument('--use_laser', default="false",help='attach laser_sensor (true/false) NOTE: Also enable use_laser in gym_rotors/__init__.py',type=str)
     return parser
 
 def robotics_arg_parser():
