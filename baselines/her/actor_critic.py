@@ -1,10 +1,11 @@
 import tensorflow as tf
-from baselines.her.util import store_args, nn
+from baselines.her.util import store_args, nn , process_input, features
+# from baselines.her.model import features
 
 
 class ActorCritic:
     @store_args
-    def __init__(self, inputs_tf, dimo, dimg, dimu, max_u, o_stats, g_stats, hidden, layers,
+    def __init__(self, inputs_tf, dimo, dimg, dimu, max_u, o_stats, g_stats, hidden, layers,ddpg_scope=None,
                  **kwargs):
         """The actor-critic network and related training code.
 
@@ -28,17 +29,45 @@ class ActorCritic:
         # Prepare inputs for actor and critic.
         o = self.o_stats.normalize(self.o_tf)
         g = self.g_stats.normalize(self.g_tf)
-        input_pi = tf.concat(axis=1, values=[o, g])  # for actor
 
-        # Networks.
+      
+        
+        # print("actor_critic...............",tf.get_variable_scope().name)
+
+        rgb_img,depth_img,other = process_input(o,size=4)
+
+        R_use = False
+        if tf.get_variable_scope().name == "ddpg/target":
+            R_use = True
+
+
+
+        with tf.variable_scope(self.ddpg_scope,reuse=R_use):
+            with tf.variable_scope('rgb') as vs:
+                # print("actor_critic_rgb..............",tf.get_variable_scope().name)
+                self.rgb_vec = features(rgb_img,penulti_linear=30,feature_size=10)
+                # vs.reuse_variables()
+            with tf.variable_scope('depth') as vs:
+                # print("actor_critic_depth..............",tf.get_variable_scope().name)
+                self.depth_vec = features(depth_img,penulti_linear=30,feature_size=10)
+                # vs.reuse_variables()
+       
+
         with tf.variable_scope('pi'):
-            self.pi_tf = self.max_u * tf.tanh(nn(
-                input_pi, [self.hidden] * self.layers + [self.dimu]))
+            # input_pi = tf.concat(axis=1, values=[o, g])  # for actor
+            input_pi = tf.concat(axis=1, values=[self.rgb_vec,self.depth_vec,other, g])  # for actor
+        # Networks.
+            self.pi_tf = self.max_u * tf.tanh(nn(input_pi, [self.hidden] * self.layers + [self.dimu]))
         with tf.variable_scope('Q'):
             # for policy training
-            input_Q = tf.concat(axis=1, values=[o, g, self.pi_tf / self.max_u])
-            self.Q_pi_tf = nn(input_Q, [self.hidden] * self.layers + [1])
+            input_Q = tf.concat(axis=1, values=[self.rgb_vec,self.depth_vec,other, g, self.pi_tf / self.max_u])
+            # # print("input_q_shape_before",input_Q.get_shape())
+            # input_Q = tf.concat(axis=1, values=[o, g, self.pi_tf / self.max_u])
+            self.Q_pi_tf = nn(tf.stop_gradient(input_Q), [self.hidden] * self.layers + [1])               #stop gradient used
+            # self.Q_pi_tf = nn(input_Q, [self.hidden] * self.layers + [1])               #stop gradient used
             # for critic training
-            input_Q = tf.concat(axis=1, values=[o, g, self.u_tf / self.max_u])
+            # input_Q = tf.concat(axis=1, values=[o, g, self.u_tf / self.max_u])
+            input_Q = tf.concat(axis=1, values=[self.rgb_vec,self.depth_vec,other,g, self.u_tf / self.max_u])
+            # print("input_q_shape_later",input_Q.get_shape())
             self._input_Q = input_Q  # exposed for tests
-            self.Q_tf = nn(input_Q, [self.hidden] * self.layers + [1], reuse=True)
+            self.Q_tf = nn(tf.stop_gradient(input_Q), [self.hidden] * self.layers + [1], reuse=True)

@@ -46,12 +46,41 @@ def import_function(spec):
     fn = getattr(module, fn_name)
     return fn
 
+def process_input(x,size=100):
+    # print("process input size",x.get_shape())
+    img_len = size*size
+    rgb_image = tf.reshape(x[:,:img_len*3],[-1,size,size,3])
+    depth_image = tf.reshape(x[:,img_len*3:4*img_len],[-1,size,size,1])
+    other = x[:,4*img_len:]
+    return rgb_image, depth_image, other
 
 def flatten_grads(var_list, grads):
     """Flattens a variables and their gradients.
     """
     return tf.concat([tf.reshape(grad, [U.numel(v)])
                       for (v, grad) in zip(var_list, grads)], 0)
+
+def features(input,penulti_linear,feature_size=50):
+
+    out = input 
+    # print(out.get_shape())
+    
+    # print(tf.get_variable_scope().name)
+
+    for i in range(1,5):
+        out = tf.layers.conv2d(out,filters=32,kernel_size=[3,3],strides=2,padding='same',activation=tf.nn.elu,name="cov2d_%d" % i)
+    
+    shape = out.get_shape().as_list()        # a list: [None, 9, 2]
+    dim = np.prod(shape[1:])            # dim = prod(9,2) = 18
+    x = tf.reshape(out, [-1, dim])           # -1 means "all"
+    
+    
+    x =  tf.layers.dense(inputs=x,units=penulti_linear,activation=tf.nn.elu,kernel_initializer=tf.contrib.layers.xavier_initializer(),reuse=False)
+    feature =  tf.layers.dense(inputs=x,units=feature_size,activation=tf.nn.elu,kernel_initializer=tf.contrib.layers.xavier_initializer(),reuse=False)
+
+    # print("after_convolution_feature",feature.get_shape())
+
+    return feature
 
 
 def nn(input, layers_sizes, reuse=None, flatten=False, name=""):

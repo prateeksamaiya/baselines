@@ -85,11 +85,8 @@ class DDPG(object):
 
         # Create network.
         with tf.variable_scope(self.scope):
-            self.staging_tf = StagingArea(
-                dtypes=[tf.float32 for _ in self.stage_shapes.keys()],
-                shapes=list(self.stage_shapes.values()))
-            self.buffer_ph_tf = [
-                tf.placeholder(tf.float32, shape=shape) for shape in self.stage_shapes.values()]
+            self.staging_tf = StagingArea(dtypes=[tf.float32 for _ in self.stage_shapes.keys()],shapes=list(self.stage_shapes.values()))
+            self.buffer_ph_tf = [tf.placeholder(tf.float32, shape=shape) for shape in self.stage_shapes.values()]
             self.stage_op = self.staging_tf.put(self.buffer_ph_tf)
 
             self._create_network(reuse=reuse)
@@ -246,20 +243,27 @@ class DDPG(object):
     def _sync_optimizers(self):
         self.Q_adam.sync()
         self.pi_adam.sync()
+        self.feature_adam.sync(),
+        self.real_depth_adam.sync()
 
     def _grads(self):
         # Avoid feed_dict here for performance!
-        critic_loss, actor_loss, Q_grad, pi_grad = self.sess.run([
+        # writer = tf.summary.FileWriter('/home/patrick/Desktop/', self.sess.graph)
+        critic_loss, actor_loss, Q_grad, pi_grad, real_depth_grad,feature_grad= self.sess.run([
             self.Q_loss_tf,
             self.main.Q_pi_tf,
             self.Q_grad_tf,
-            self.pi_grad_tf
+            self.pi_grad_tf,
+            self.real_depth_grad_tf,
+            self.feature_grad_tf
         ])
-        return critic_loss, actor_loss, Q_grad, pi_grad
+        return critic_loss, actor_loss, Q_grad, pi_grad , real_depth_grad,feature_grad
 
-    def _update(self, Q_grad, pi_grad):
+    def _update(self, Q_grad, pi_grad, real_depth_grad,feature_grad):
         self.Q_adam.update(Q_grad, self.Q_lr)
         self.pi_adam.update(pi_grad, self.pi_lr)
+        self.feature_adam.update(feature_grad, self.pi_lr)
+        self.real_depth_adam.update(real_depth_grad, self.pi_lr)
 
     def sample_batch(self):
 
@@ -292,8 +296,11 @@ class DDPG(object):
     def train(self, stage=True):
         if stage:
             self.stage_batch()
-        critic_loss, actor_loss, Q_grad, pi_grad = self._grads()
-        self._update(Q_grad, pi_grad)
+        critic_loss, actor_loss, Q_grad, pi_grad, real_depth_grad,feature_grad = self._grads()
+        self._update(Q_grad, pi_grad, real_depth_grad,feature_grad)
+        # print(self._vars("rgb"))
+        # print(self._vars("rgb")[-1].eval()[0])
+        # print(self._vars("rgb")[0].eval()[0][0][0][0])
         return critic_loss, actor_loss
 
     def _init_target_net(self):
@@ -306,6 +313,7 @@ class DDPG(object):
         self.buffer.clear_buffer()
 
     def _vars(self, scope):
+        # print("current scope",self.scope)
         res = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.scope + '/' + scope)
         assert len(res) > 0
         return res
@@ -330,18 +338,18 @@ class DDPG(object):
 
         # mini-batch sampling.
         batch = self.staging_tf.get()
-        batch_tf = OrderedDict([(key, batch[i])
-                                for i, key in enumerate(self.stage_shapes.keys())])
+        batch_tf = OrderedDict([(key, batch[i]) for i, key in enumerate(self.stage_shapes.keys())])
         batch_tf['r'] = tf.reshape(batch_tf['r'], [-1, 1])
 
         #choose only the demo buffer samples
         mask = np.concatenate((np.zeros(self.batch_size - self.demo_batch_size), np.ones(self.demo_batch_size)), axis = 0)
 
+        scope = tf.get_variable_scope()
         # networks
         with tf.variable_scope('main') as vs:
             if reuse:
                 vs.reuse_variables()
-            self.main = self.create_actor_critic(batch_tf, net_type='main', **self.__dict__)
+            self.main = self.create_actor_critic(batch_tf, net_type='main',ddpg_scope=scope, **self.__dict__)
             vs.reuse_variables()
         with tf.variable_scope('target') as vs:
             if reuse:
@@ -349,10 +357,28 @@ class DDPG(object):
             target_batch_tf = batch_tf.copy()
             target_batch_tf['o'] = batch_tf['o_2']
             target_batch_tf['g'] = batch_tf['g_2']
-            self.target = self.create_actor_critic(
-                target_batch_tf, net_type='target', **self.__dict__)
+            self.target = self.create_actor_critic(target_batch_tf, net_type='target',ddpg_scope=scope, **self.__dict__)
             vs.reuse_variables()
         assert len(self._vars("main")) == len(self._vars("target"))
+
+        #real-depth-network
+        output_size = self.main.rgb_vec.get_shape()[1]
+        # print(output_size)
+        with tf.variable_scope("real_depth") as vs:
+            self.pred_depth_vec =  tf.layers.dense(inputs=self.main.rgb_vec,
+                                    units=20,
+                                    activation=tf.nn.relu,
+                                    kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                                    reuse=False)
+                                    
+            self.pred_depth_vec =  tf.layers.dense(inputs=self.pred_depth_vec,
+                                    units=output_size,
+                                    activation=tf.nn.relu,
+                                    kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                                    reuse=False)
+
+           
+
 
         # loss functions
         target_Q_pi_tf = self.target.Q_pi_tf
@@ -378,27 +404,42 @@ class DDPG(object):
             self.pi_loss_tf = -tf.reduce_mean(self.main.Q_pi_tf)
             self.pi_loss_tf += self.action_l2 * tf.reduce_mean(tf.square(self.main.pi_tf / self.max_u))
 
+        
+        #real_depth_loss
+        self.real_depth_loss = tf.losses.mean_squared_error(tf.stop_gradient(self.main.depth_vec),self.pred_depth_vec)
+
+
+
+        real_depth_grads_tf = tf.gradients(self.real_depth_loss, self._vars('real_depth')+self._vars('rgb'))
         Q_grads_tf = tf.gradients(self.Q_loss_tf, self._vars('main/Q'))
         pi_grads_tf = tf.gradients(self.pi_loss_tf, self._vars('main/pi'))
+        feature_grads_tf = tf.gradients(self.pi_loss_tf, self._vars('rgb')+self._vars('depth'))
+        assert len(self._vars('real_depth')+self._vars('rgb')) == len(real_depth_grads_tf)
         assert len(self._vars('main/Q')) == len(Q_grads_tf)
         assert len(self._vars('main/pi')) == len(pi_grads_tf)
+        assert len(self._vars('rgb')+self._vars('depth')) == len(feature_grads_tf)
+        self.real_depth_grads_vars_tf = zip(real_depth_grads_tf, self._vars('real_depth')+self._vars('rgb'))
         self.Q_grads_vars_tf = zip(Q_grads_tf, self._vars('main/Q'))
         self.pi_grads_vars_tf = zip(pi_grads_tf, self._vars('main/pi'))
+        self.feature_grads_vars_tf = zip(feature_grads_tf, self._vars('rgb')+self._vars('depth'))
+        self.real_depth_grad_tf = flatten_grads(grads=real_depth_grads_tf, var_list=self._vars('real_depth')+self._vars('rgb'))
         self.Q_grad_tf = flatten_grads(grads=Q_grads_tf, var_list=self._vars('main/Q'))
         self.pi_grad_tf = flatten_grads(grads=pi_grads_tf, var_list=self._vars('main/pi'))
+        self.feature_grad_tf = flatten_grads(grads=feature_grads_tf, var_list=self._vars('rgb')+self._vars('depth'))
 
         # optimizers
+        self.real_depth_adam = MpiAdam(self._vars('real_depth')+self._vars('rgb'), scale_grad_by_procs=False)
         self.Q_adam = MpiAdam(self._vars('main/Q'), scale_grad_by_procs=False)
         self.pi_adam = MpiAdam(self._vars('main/pi'), scale_grad_by_procs=False)
+        self.feature_adam = MpiAdam(self._vars('rgb')+self._vars('depth'), scale_grad_by_procs=False)
+
 
         # polyak averaging
         self.main_vars = self._vars('main/Q') + self._vars('main/pi')
         self.target_vars = self._vars('target/Q') + self._vars('target/pi')
         self.stats_vars = self._global_vars('o_stats') + self._global_vars('g_stats')
-        self.init_target_net_op = list(
-            map(lambda v: v[0].assign(v[1]), zip(self.target_vars, self.main_vars)))
-        self.update_target_net_op = list(
-            map(lambda v: v[0].assign(self.polyak * v[0] + (1. - self.polyak) * v[1]), zip(self.target_vars, self.main_vars)))
+        self.init_target_net_op = list(map(lambda v: v[0].assign(v[1]), zip(self.target_vars, self.main_vars)))
+        self.update_target_net_op = list(map(lambda v: v[0].assign(self.polyak * v[0] + (1. - self.polyak) * v[1]), zip(self.target_vars, self.main_vars)))
 
         # initialize all variables
         tf.variables_initializer(self._global_vars('')).run()
@@ -411,6 +452,7 @@ class DDPG(object):
         logs += [('stats_o/std', np.mean(self.sess.run([self.o_stats.std])))]
         logs += [('stats_g/mean', np.mean(self.sess.run([self.g_stats.mean])))]
         logs += [('stats_g/std', np.mean(self.sess.run([self.g_stats.std])))]
+        # logs += [('real_depth_loss',np.mean(self.sess.run([self.real_depth_loss])))]
 
         if prefix != '' and not prefix.endswith('/'):
             return [(prefix + '/' + key, val) for key, val in logs]

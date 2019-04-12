@@ -55,9 +55,6 @@ class RolloutWorker:
         """
         self.reset_all_rollouts()
 
-        # print("rollout_batch_size",self.rollout_batch_size)
-        # assert(False)
-
         # compute observations
         o = np.empty((self.rollout_batch_size, self.dims['o']), np.float32)  # observations
         ag = np.empty((self.rollout_batch_size, self.dims['g']), np.float32)  # achieved goals
@@ -70,6 +67,7 @@ class RolloutWorker:
         info_values = [np.empty((self.T - 1, self.rollout_batch_size, self.dims['info_' + key]), np.float32) for key in self.info_keys]
         Qs = []
         for t in range(self.T):
+            print(t)
             # start = rospy.get_rostime()
             policy_output = self.policy.get_actions(
                 o, ag, self.g,
@@ -96,10 +94,7 @@ class RolloutWorker:
             o_new = obs_dict_new['observation']
             ag_new = obs_dict_new['achieved_goal']
             success = np.array([i.get('is_success', 0.0) for i in info])
-            # print(info)
-            # print(success)
-            # print("done",done)
-            # assert(False)
+            
 
             if any(done):
                 if not t:
