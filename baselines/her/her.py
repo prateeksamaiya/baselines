@@ -60,8 +60,6 @@ def train(*, policy, rollout_worker, evaluator,
             logger.record_tabular(key, mpi_average(val))
         for key, val in rollout_worker.logs('train'):
             logger.record_tabular(key, mpi_average(val))
-        
-        print("breakpoint")
         for key, val in policy.logs():
             logger.record_tabular(key, mpi_average(val))
 

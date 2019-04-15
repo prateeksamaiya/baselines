@@ -249,15 +249,16 @@ class DDPG(object):
     def _grads(self):
         # Avoid feed_dict here for performance!
         # writer = tf.summary.FileWriter('/home/patrick/Desktop/', self.sess.graph)
-        critic_loss, actor_loss, Q_grad, pi_grad, real_depth_grad,feature_grad= self.sess.run([
+        critic_loss, actor_loss, Q_grad, pi_grad, real_depth_grad,feature_grad,rd_loss= self.sess.run([
             self.Q_loss_tf,
             self.main.Q_pi_tf,
             self.Q_grad_tf,
             self.pi_grad_tf,
             self.real_depth_grad_tf,
-            self.feature_grad_tf
+            self.feature_grad_tf,
+            self.real_depth_loss,
         ])
-        return critic_loss, actor_loss, Q_grad, pi_grad , real_depth_grad,feature_grad
+        return critic_loss, actor_loss, Q_grad, pi_grad , real_depth_grad,feature_grad,rd_loss
 
     def _update(self, Q_grad, pi_grad, real_depth_grad,feature_grad):
         self.Q_adam.update(Q_grad, self.Q_lr)
@@ -296,7 +297,7 @@ class DDPG(object):
     def train(self, stage=True):
         if stage:
             self.stage_batch()
-        critic_loss, actor_loss, Q_grad, pi_grad, real_depth_grad,feature_grad = self._grads()
+        critic_loss, actor_loss, Q_grad, pi_grad, real_depth_grad,feature_grad,self.rd_loss= self._grads()
         self._update(Q_grad, pi_grad, real_depth_grad,feature_grad)
         # print(self._vars("rgb"))
         # print(self._vars("rgb")[-1].eval()[0])
@@ -373,7 +374,6 @@ class DDPG(object):
                                     
             self.pred_depth_vec =  tf.layers.dense(inputs=self.pred_depth_vec,
                                     units=output_size,
-                                    activation=tf.nn.relu,
                                     kernel_initializer=tf.contrib.layers.xavier_initializer(),
                                     reuse=False)
 
@@ -452,7 +452,8 @@ class DDPG(object):
         logs += [('stats_o/std', np.mean(self.sess.run([self.o_stats.std])))]
         logs += [('stats_g/mean', np.mean(self.sess.run([self.g_stats.mean])))]
         logs += [('stats_g/std', np.mean(self.sess.run([self.g_stats.std])))]
-        # logs += [('real_depth_loss',np.mean(self.sess.run([self.real_depth_loss])))]
+        logs += [('real_depth_loss',self.rd_loss)]
+        # print(self.rd_loss)
 
         if prefix != '' and not prefix.endswith('/'):
             return [(prefix + '/' + key, val) for key, val in logs]
