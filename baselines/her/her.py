@@ -107,8 +107,6 @@ def train(*, policy, rollout_worker, evaluator,
             logger.record_tabular(key, mpi_average(val))
         for key, val in rollout_worker.logs('train'):
             logger.record_tabular(key, mpi_average(val))
-        
-        # print("breakpoint")
         for key, val in policy.logs():
             logger.record_tabular(key, mpi_average(val))
 
@@ -138,7 +136,7 @@ def train(*, policy, rollout_worker, evaluator,
             path = osp.expanduser(save_path)
             policy.save(path+"/policy_"+str(epoch))
 
-            
+
         rest_epoch_time = time.time()-rest_start_time
         mean_rest_time += (rest_epoch_time - mean_rest_time)/(epoch+1)
         print("avg:(rollout,store,train,update,) times : ",a/n_cycles,b/n_cycles,c/n_cycles,d/n_cycles,mean_rest_time)
