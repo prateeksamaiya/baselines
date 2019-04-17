@@ -84,12 +84,13 @@ class DDPG(object):
         self.stage_shapes = stage_shapes
 
         # Create network.
-        with tf.variable_scope(self.scope):
-            self.staging_tf = StagingArea(dtypes=[tf.float32 for _ in self.stage_shapes.keys()],shapes=list(self.stage_shapes.values()))
-            self.buffer_ph_tf = [tf.placeholder(tf.float32, shape=shape) for shape in self.stage_shapes.values()]
-            self.stage_op = self.staging_tf.put(self.buffer_ph_tf)
+        with tf.device('/device:GPU:0'):
+            with tf.variable_scope(self.scope):
+                self.staging_tf = StagingArea(dtypes=[tf.float32 for _ in self.stage_shapes.keys()],shapes=list(self.stage_shapes.values()))
+                self.buffer_ph_tf = [tf.placeholder(tf.float32, shape=shape) for shape in self.stage_shapes.values()]
+                self.stage_op = self.staging_tf.put(self.buffer_ph_tf)
 
-            self._create_network(reuse=reuse)
+                self._create_network(reuse=reuse)
 
         # Configure the replay buffer.
         buffer_shapes = {key: (self.T-1 if key != 'o' else self.T, *input_shapes[key])
@@ -249,13 +250,14 @@ class DDPG(object):
     def _grads(self):
         # Avoid feed_dict here for performance!
         # writer = tf.summary.FileWriter('/home/patrick/Desktop/', self.sess.graph)
-        critic_loss, actor_loss, Q_grad, pi_grad, real_depth_grad,feature_grad= self.sess.run([
+        critic_loss, actor_loss, Q_grad, pi_grad, real_depth_grad,feature_grad,self.rd_loss= self.sess.run([
             self.Q_loss_tf,
             self.main.Q_pi_tf,
             self.Q_grad_tf,
             self.pi_grad_tf,
             self.real_depth_grad_tf,
-            self.feature_grad_tf
+            self.feature_grad_tf,
+            self.real_depth_loss
         ])
         return critic_loss, actor_loss, Q_grad, pi_grad , real_depth_grad,feature_grad
 
@@ -366,7 +368,7 @@ class DDPG(object):
         # print(output_size)
         with tf.variable_scope("real_depth") as vs:
             self.pred_depth_vec =  tf.layers.dense(inputs=self.main.rgb_vec,
-                                    units=20,
+                                    units=256,
                                     activation=tf.nn.relu,
                                     kernel_initializer=tf.contrib.layers.xavier_initializer(),
                                     reuse=False)
@@ -452,7 +454,7 @@ class DDPG(object):
         logs += [('stats_o/std', np.mean(self.sess.run([self.o_stats.std])))]
         logs += [('stats_g/mean', np.mean(self.sess.run([self.g_stats.mean])))]
         logs += [('stats_g/std', np.mean(self.sess.run([self.g_stats.std])))]
-        # logs += [('real_depth_loss',np.mean(self.sess.run([self.real_depth_loss])))]
+        logs += [('real_depth_loss',self.rd_loss)]
 
         if prefix != '' and not prefix.endswith('/'):
             return [(prefix + '/' + key, val) for key, val in logs]

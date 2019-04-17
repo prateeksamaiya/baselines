@@ -67,7 +67,7 @@ class RolloutWorker:
         info_values = [np.empty((self.T - 1, self.rollout_batch_size, self.dims['info_' + key]), np.float32) for key in self.info_keys]
         Qs = []
         for t in range(self.T):
-            print(t)
+            # print(t)
             # start = rospy.get_rostime()
             policy_output = self.policy.get_actions(
                 o, ag, self.g,

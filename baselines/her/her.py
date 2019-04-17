@@ -4,7 +4,7 @@ import click
 import numpy as np
 import json
 from mpi4py import MPI
-
+import time
 from baselines import logger
 import os.path as osp
 from baselines.common import set_global_seeds, tf_util
@@ -36,18 +36,65 @@ def train(*, policy, rollout_worker, evaluator,
 
     if policy.bc_loss == 1: policy.init_demo_buffer(demo_file) #initialize demo buffer if training with demonstrations
 
-    # num_timesteps = n_epochs * n_cycles * rollout_length * number of rollout workers
+    # # num_timesteps = n_epochs * n_cycles * rollout_length * number of rollout workers
+   
+    
+    # for epoch in range(n_epochs):
+    #     start_time = time.time()
+    #     # train
+    #     rollout_worker.clear_history()
+    #     for i in range(n_cycles):
+    #         print(i)
+    #         episode = rollout_worker.generate_rollouts()
+    #         # print("checkpoint 1")
+    #         policy.store_episode(episode)
+    #         # print("checkpoint 2")
+    #         for _ in range(n_batches):
+    #             policy.train()
+    #         policy.update_target_net()
+
+    #         print("single_episode_time",time.time()-start_time)
+
+    mean_epoch_time = 0
+    mean_rest_time = 0
     for epoch in range(n_epochs):
+        epoch_start_time = time.time()
+        a = b = c = d = 0.0
         # train
         rollout_worker.clear_history()
-        for _ in range(n_cycles):
+        for count in range(n_cycles):
+            # print(count)
+            rollout_start_time = time.time()
             episode = rollout_worker.generate_rollouts()
+            # print("rollout_epoch_time : ",time.time()-rollout_start_time)
+            a += time.time()-rollout_start_time
+            # A = time.time()-rollout_start_time
+
             # print("checkpoint 1")
+            store_start_time = time.time()
             policy.store_episode(episode)
+            # print("store_epoch_time : ",time.time()-store_start_time)
+            b += time.time()-store_start_time
+            # B = time.time()-store_start_time
             # print("checkpoint 2")
+            train_start_time = time.time()
             for _ in range(n_batches):
                 policy.train()
+            # print("train_epoch_time : ",time.time()-train_start_time)
+            c += time.time()-train_start_time
+            # C  = time.time()-train_start_time
+            # print("checkpoint 3")
+
+            update_start_time = time.time()
             policy.update_target_net()
+            # print("update_epoch_time : ",time.time()-update_start_time)
+            d += time.time()-update_start_time
+            # D = time.time()-update_start_time
+            # print(A,B,C,D)
+            # print("checkpoint 4")
+
+
+        rest_start_time= time.time()
 
         # test
         evaluator.clear_history()
@@ -61,7 +108,7 @@ def train(*, policy, rollout_worker, evaluator,
         for key, val in rollout_worker.logs('train'):
             logger.record_tabular(key, mpi_average(val))
         
-        print("breakpoint")
+        # print("breakpoint")
         for key, val in policy.logs():
             logger.record_tabular(key, mpi_average(val))
 
@@ -90,6 +137,13 @@ def train(*, policy, rollout_worker, evaluator,
         if epoch%10==0 and rank == 0:
             path = osp.expanduser(save_path)
             policy.save(path+"/policy_"+str(epoch))
+
+            
+        rest_epoch_time = time.time()-rest_start_time
+        mean_rest_time += (rest_epoch_time - mean_rest_time)/(epoch+1)
+        print("avg:(rollout,store,train,update,) times : ",a/n_cycles,b/n_cycles,c/n_cycles,d/n_cycles,mean_rest_time)
+        # print("rest_epoch_time : ",time.time()-rest_start_time)
+        print("average_epoch_time : ",mean_epoch_time+(time.time()-epoch_start_time-mean_epoch_time)/(epoch+1))
 
     return policy
 

@@ -34,7 +34,7 @@ class ActorCritic:
         
         # print("actor_critic...............",tf.get_variable_scope().name)
 
-        rgb_img,depth_img,other = process_input(o,size=4)
+        rgb_img,depth_img,other = process_input(o,size=50)
 
         R_use = False
         if tf.get_variable_scope().name == "ddpg/target":
@@ -45,11 +45,11 @@ class ActorCritic:
         with tf.variable_scope(self.ddpg_scope,reuse=R_use):
             with tf.variable_scope('rgb') as vs:
                 # print("actor_critic_rgb..............",tf.get_variable_scope().name)
-                self.rgb_vec = features(rgb_img,penulti_linear=30,feature_size=10)
+                self.rgb_vec = features(rgb_img,penulti_linear=256,feature_size=32)
                 # vs.reuse_variables()
             with tf.variable_scope('depth') as vs:
                 # print("actor_critic_depth..............",tf.get_variable_scope().name)
-                self.depth_vec = features(depth_img,penulti_linear=30,feature_size=10)
+                self.depth_vec = features(depth_img,penulti_linear=256,feature_size=32)
                 # vs.reuse_variables()
        
 
