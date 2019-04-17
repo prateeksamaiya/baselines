@@ -141,7 +141,9 @@ def train(*, policy, rollout_worker, evaluator,
         mean_rest_time += (rest_epoch_time - mean_rest_time)/(epoch+1)
         print("avg:(rollout,store,train,update,) times : ",a/n_cycles,b/n_cycles,c/n_cycles,d/n_cycles,mean_rest_time)
         # print("rest_epoch_time : ",time.time()-rest_start_time)
-        print("average_epoch_time : ",mean_epoch_time+(time.time()-epoch_start_time-mean_epoch_time)/(epoch+1))
+        current_epoch_time = time.time()-epoch_start_time
+        mean_epoch_time += (current_epoch_time - mean_epoch_time)/(epoch+1)
+        print("average_epoch_time : ",mean_epoch_time)
 
     return policy
 
