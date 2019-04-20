@@ -62,6 +62,7 @@ class DDPG(object):
             demo_batch_size: number of samples to be used from the demonstrations buffer, per mpi thread
             prm_loss_weight: Weight corresponding to the primary loss
             aux_loss_weight: Weight corresponding to the auxilliary loss also called the cloning loss
+
         """
         if self.clip_return is None:
             self.clip_return = np.inf
@@ -492,8 +493,8 @@ class DDPG(object):
         logs += [('stats_rgb/std', np.mean(self.sess.run([self.rgb_stats.std])))]
         logs += [('stats_depth/mean', np.mean(self.sess.run([self.depth_stats.mean])))]
         logs += [('stats_depth/std', np.mean(self.sess.run([self.depth_stats.std])))]
-        logs += [('stats_other/mean', np.mean(self.sess.run([self.other_stats.mean])))]
-        logs += [('stats_other/std', np.mean(self.sess.run([self.other_stats.std])))]
+        logs += [('stats_o/mean', np.mean(self.sess.run([self.other_stats.mean])))]
+        logs += [('stats_o/std', np.mean(self.sess.run([self.other_stats.std])))]
         logs += [('stats_g/mean', np.mean(self.sess.run([self.g_stats.mean])))]
         logs += [('stats_g/std', np.mean(self.sess.run([self.g_stats.std])))]
         logs += [('real_depth_loss',self.rd_loss)]
