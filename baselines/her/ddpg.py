@@ -1,16 +1,17 @@
 from collections import OrderedDict
 
 import numpy as np
+import math
 import tensorflow as tf
 from tensorflow.contrib.staging import StagingArea
-
 from baselines import logger
 from baselines.her.util import (
-    import_function, store_args, flatten_grads, transitions_in_episode_batch, convert_episode_to_batch_major)
+    import_function, store_args, flatten_grads, transitions_in_episode_batch, convert_episode_to_batch_major, process_input,process_input_np)
 from baselines.her.normalizer import Normalizer
 from baselines.her.replay_buffer import ReplayBuffer
 from baselines.common.mpi_adam import MpiAdam
 from baselines.common import tf_util
+
 
 
 def dims_to_shapes(input_dims):
@@ -68,7 +69,12 @@ class DDPG(object):
         self.create_actor_critic = import_function(self.network_class)
 
         input_shapes = dims_to_shapes(self.input_dims)
+        flat_image_size = (self.input_dims['o'] - 13)//4
+        self.dim_image = int(math.sqrt(flat_image_size))
         self.dimo = self.input_dims['o']
+        self.dim_rgb = 3*flat_image_size  # 3 channels
+        self.dim_depth = flat_image_size
+        self.dim_other = 13
         self.dimg = self.input_dims['g']
         self.dimu = self.input_dims['u']
 
@@ -203,10 +209,15 @@ class DDPG(object):
                 transitions['o'], transitions['g'] = self._preprocess_og(o, ag, g)
                 # No need to preprocess the o_2 and g_2 since this is only used for stats
 
-                self.o_stats.update(transitions['o'])
+                rgb_img,depth_img,other = process_input_np(transitions['o'],size=self.dim_image)
+                self.rgb_stats.update(rgb_img)
+                self.depth_stats.update(depth_img)
+                self.other_stats.update(other)
                 self.g_stats.update(transitions['g'])
 
-                self.o_stats.recompute_stats()
+                self.rgb_stats.recompute_stats()
+                self.depth_stats.recompute_stats()
+                self.other_stats.recompute_stats()
                 self.g_stats.recompute_stats()
             episode.clear()
 
@@ -232,10 +243,21 @@ class DDPG(object):
             transitions['o'], transitions['g'] = self._preprocess_og(o, ag, g)
             # No need to preprocess the o_2 and g_2 since this is only used for stats
 
-            self.o_stats.update(transitions['o'])
+            # self.o_stats.update(transitions['o'])
+            # self.g_stats.update(transitions['g'])
+
+            # self.o_stats.recompute_stats()
+            # self.g_stats.recompute_stats()
+
+            rgb_img,depth_img,other = process_input_np(transitions['o'],size=self.dim_image)
+            self.rgb_stats.update(rgb_img)
+            self.depth_stats.update(depth_img)
+            self.other_stats.update(other)
             self.g_stats.update(transitions['g'])
 
-            self.o_stats.recompute_stats()
+            self.rgb_stats.recompute_stats()
+            self.depth_stats.recompute_stats()
+            self.other_stats.recompute_stats()
             self.g_stats.recompute_stats()
 
     def get_current_buffer_size(self):
@@ -258,7 +280,15 @@ class DDPG(object):
             self.real_depth_grad_tf,
             self.feature_grad_tf,
             self.real_depth_loss,
+            # self.main.o_tf,
+            # self.main.rgb_img,
+            # self.main.depth_img,
+            # self.main.other,
         ])
+        # print(inp.shape,inp[0])
+        # print(r.shape,r[0])
+        # print(d.shape,d[0])
+        # print(o.shape,o[0])
         return critic_loss, actor_loss, Q_grad, pi_grad , real_depth_grad,feature_grad,rd_loss
 
     def _update(self, Q_grad, pi_grad, real_depth_grad,feature_grad):
@@ -329,10 +359,18 @@ class DDPG(object):
         self.sess = tf_util.get_session()
 
         # running averages
-        with tf.variable_scope('o_stats') as vs:
+        with tf.variable_scope('rgb_stats') as vs:
             if reuse:
                 vs.reuse_variables()
-            self.o_stats = Normalizer(self.dimo, self.norm_eps, self.norm_clip, sess=self.sess)
+            self.rgb_stats = Normalizer(self.dim_rgb, self.norm_eps, self.norm_clip, sess=self.sess)
+        with tf.variable_scope('depth_stats') as vs:
+            if reuse:
+                vs.reuse_variables()
+            self.depth_stats = Normalizer(self.dim_depth, self.norm_eps, self.norm_clip, sess=self.sess)
+        with tf.variable_scope('other_stats') as vs:
+            if reuse:
+                vs.reuse_variables()
+            self.other_stats = Normalizer(self.dim_other, self.norm_eps, self.norm_clip, sess=self.sess)
         with tf.variable_scope('g_stats') as vs:
             if reuse:
                 vs.reuse_variables()
@@ -347,6 +385,7 @@ class DDPG(object):
         mask = np.concatenate((np.zeros(self.batch_size - self.demo_batch_size), np.ones(self.demo_batch_size)), axis = 0)
 
         scope = tf.get_variable_scope()
+        # print(self.__dict__)
         # networks
         with tf.variable_scope('main') as vs:
             if reuse:
@@ -438,7 +477,7 @@ class DDPG(object):
         # polyak averaging
         self.main_vars = self._vars('main/Q') + self._vars('main/pi')
         self.target_vars = self._vars('target/Q') + self._vars('target/pi')
-        self.stats_vars = self._global_vars('o_stats') + self._global_vars('g_stats')
+        self.stats_vars = self._global_vars('rgb_stats') + self._global_vars('depth_stats')+ self._global_vars('other_stats')+ self._global_vars('g_stats')
         self.init_target_net_op = list(map(lambda v: v[0].assign(v[1]), zip(self.target_vars, self.main_vars)))
         self.update_target_net_op = list(map(lambda v: v[0].assign(self.polyak * v[0] + (1. - self.polyak) * v[1]), zip(self.target_vars, self.main_vars)))
 
@@ -449,8 +488,12 @@ class DDPG(object):
 
     def logs(self, prefix=''):
         logs = []
-        logs += [('stats_o/mean', np.mean(self.sess.run([self.o_stats.mean])))]
-        logs += [('stats_o/std', np.mean(self.sess.run([self.o_stats.std])))]
+        logs += [('stats_rgb/mean', np.mean(self.sess.run([self.rgb_stats.mean])))]
+        logs += [('stats_rgb/std', np.mean(self.sess.run([self.rgb_stats.std])))]
+        logs += [('stats_depth/mean', np.mean(self.sess.run([self.depth_stats.mean])))]
+        logs += [('stats_depth/std', np.mean(self.sess.run([self.depth_stats.std])))]
+        logs += [('stats_other/mean', np.mean(self.sess.run([self.other_stats.mean])))]
+        logs += [('stats_other/std', np.mean(self.sess.run([self.other_stats.std])))]
         logs += [('stats_g/mean', np.mean(self.sess.run([self.g_stats.mean])))]
         logs += [('stats_g/std', np.mean(self.sess.run([self.g_stats.std])))]
         logs += [('real_depth_loss',self.rd_loss)]

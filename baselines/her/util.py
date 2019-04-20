@@ -46,11 +46,27 @@ def import_function(spec):
     fn = getattr(module, fn_name)
     return fn
 
+def process_input_np(x,size=100):
+    # print("process input size",x.get_shape())
+    img_len = size*size
+    rgb_image = np.reshape(x[:,:img_len*3],[-1,size,size,3])
+    depth_image = np.reshape(x[:,img_len*3:4*img_len],[-1,size,size,1])
+    other = x[:,4*img_len:]
+    return rgb_image, depth_image, other
+    
 def process_input(x,size=100):
     # print("process input size",x.get_shape())
     img_len = size*size
     rgb_image = tf.reshape(x[:,:img_len*3],[-1,size,size,3])
     depth_image = tf.reshape(x[:,img_len*3:4*img_len],[-1,size,size,1])
+    other = x[:,4*img_len:]
+    return rgb_image, depth_image, other
+
+def flat_process_input(x,size=100):
+    # print("process input size",x.get_shape())
+    img_len = size*size
+    rgb_image = x[:,:img_len*3]
+    depth_image = x[:,img_len*3:4*img_len]
     other = x[:,4*img_len:]
     return rgb_image, depth_image, other
 

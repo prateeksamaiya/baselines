@@ -1,11 +1,11 @@
 import tensorflow as tf
-from baselines.her.util import store_args, nn , process_input, features
+from baselines.her.util import store_args, nn , process_input, features, flat_process_input
 # from baselines.her.model import features
 
 
 class ActorCritic:
     @store_args
-    def __init__(self, inputs_tf, dimo, dimg, dimu, max_u, o_stats, g_stats, hidden, layers,ddpg_scope=None,
+    def __init__(self, inputs_tf, dimo,dim_rgb,dim_depth,dim_other,dimg, dimu, max_u, g_stats, hidden, layers,ddpg_scope=None,
                  **kwargs):
         """The actor-critic network and related training code.
 
@@ -26,15 +26,19 @@ class ActorCritic:
         self.g_tf = inputs_tf['g']
         self.u_tf = inputs_tf['u']
 
+
+        rgb_tf,depth_tf,other_tf = flat_process_input(self.o_tf,size=self.dim_image)
+
         # Prepare inputs for actor and critic.
-        o = self.o_stats.normalize(self.o_tf)
+        rgb_img = self.rgb_stats.normalize(rgb_tf)
+        depth_img = self.depth_stats.normalize(depth_tf)
+        other = self.other_stats.normalize(other_tf)
         g = self.g_stats.normalize(self.g_tf)
 
       
-        
-        # print("actor_critic...............",tf.get_variable_scope().name)
-
-        rgb_img,depth_img,other = process_input(o,size=50)
+        rgb_img = tf.reshape(rgb_img,[-1,self.dim_image,self.dim_image,3])
+        depth_img = tf.reshape(depth_img,[-1,self.dim_image,self.dim_image,1])
+    
 
         R_use = False
         if tf.get_variable_scope().name == "ddpg/target":

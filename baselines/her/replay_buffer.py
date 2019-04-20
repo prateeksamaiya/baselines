@@ -14,6 +14,8 @@ class ReplayBuffer:
             T (int): the time horizon for episodes
             sample_transitions (function): a function that samples from the replay buffer
         """
+
+        # print("buffer_shapes.............",size_in_transitions)
         self.buffer_shapes = buffer_shapes
         self.size = size_in_transitions // T
         self.T = T
