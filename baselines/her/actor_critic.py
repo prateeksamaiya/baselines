@@ -56,22 +56,23 @@ class ActorCritic:
                 self.depth_vec = features(depth_img,penulti_linear=256,feature_size=32)
                 # vs.reuse_variables()
        
+        self.depth_vector = self.depth_vec
 
         with tf.variable_scope('pi'):
             # input_pi = tf.concat(axis=1, values=[o, g])  # for actor
-            input_pi = tf.concat(axis=1, values=[self.rgb_vec,self.depth_vec,other, g])  # for actor
+            input_pi = tf.concat(axis=1, values=[self.rgb_vec,self.depth_vector,other, g])  # for actor
         # Networks.
             self.pi_tf = self.max_u * tf.tanh(nn(input_pi, [self.hidden] * self.layers + [self.dimu]))
         with tf.variable_scope('Q'):
             # for policy training
-            input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec),tf.stop_gradient(self.depth_vec),other, g, self.pi_tf / self.max_u]) #stop gradient used
+            input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec),tf.stop_gradient(self.depth_vector),other, g, self.pi_tf / self.max_u]) #stop gradient used
             # # print("input_q_shape_before",input_Q.get_shape())
             # input_Q = tf.concat(axis=1, values=[o, g, self.pi_tf / self.max_u])
             self.Q_pi_tf = nn(input_Q, [self.hidden] * self.layers + [1])               
             # self.Q_pi_tf = nn(input_Q, [self.hidden] * self.layers + [1])               
             # for critic training
             # input_Q = tf.concat(axis=1, values=[o, g, self.u_tf / self.max_u])
-            input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec),tf.stop_gradient(self.depth_vec),other,g, self.u_tf / self.max_u]) #stop gradient used
+            input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec),tf.stop_gradient(self.depth_vector),other,g, self.u_tf / self.max_u]) #stop gradient used
             # print("input_q_shape_later",input_Q.get_shape())
             self._input_Q = input_Q  # exposed for tests
             self.Q_tf = nn(input_Q, [self.hidden] * self.layers + [1], reuse=True)
