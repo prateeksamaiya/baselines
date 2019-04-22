@@ -110,6 +110,9 @@ def train(*, policy, rollout_worker, evaluator,
         for key, val in policy.logs():
             logger.record_tabular(key, mpi_average(val))
 
+
+            
+
         if rank == 0:
             logger.dump_tabular()
 

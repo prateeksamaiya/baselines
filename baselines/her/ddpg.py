@@ -279,8 +279,8 @@ class DDPG(object):
 
     def _grads(self):
         # Avoid feed_dict here for performance!
-        writer = tf.summary.FileWriter('/home/patrick/Desktop/', self.sess.graph)
-        critic_loss, actor_loss, Q_grad, pi_grad, pred_depth_grad,feature_grad,rd_loss= self.sess.run([
+        # writer = tf.summary.FileWriter('/home/patrick/Desktop/tensorboard/', self.sess.graph)
+        critic_loss, actor_loss, Q_grad, pi_grad, pred_depth_grad,feature_grad,rd_loss = self.sess.run([
             self.Q_loss_tf,
             self.main.Q_pi_tf,
             self.Q_grad_tf,
@@ -292,11 +292,13 @@ class DDPG(object):
             # self.main.rgb_img,
             # self.main.depth_img,
             # self.main.other,
+            # self.main.input_pi,
         ])
         # print(inp.shape,inp[0])
         # print(r.shape,r[0])
         # print(d.shape,d[0])
         # print(o.shape,o[0])
+        # print(pi_input.shape,pi_input[0])
         return critic_loss, actor_loss, Q_grad, pi_grad , pred_depth_grad,feature_grad,rd_loss
 
     def _update(self, Q_grad, pi_grad, pred_depth_grad,feature_grad):
@@ -412,16 +414,16 @@ class DDPG(object):
         assert len(self._vars("main")) == len(self._vars("target"))
 
         #real-depth-network
-        output_size = self.main.rgb_vec.get_shape()[1]
+        output_size = self.main.feature_size
         # print(output_size)
         with tf.variable_scope("pred_depth") as vs:
-            self.pred_depth_vec =  tf.layers.dense(inputs=self.main.rgb_vec,
+            depth_vec =  tf.layers.dense(inputs=tf.stop_gradient(self.main.rgb_vec),
                                     units=256,
                                     activation=tf.nn.relu,
                                     kernel_initializer=tf.contrib.layers.xavier_initializer(),
                                     reuse=False)
                                     
-            self.pred_depth_vec =  tf.layers.dense(inputs=self.pred_depth_vec,
+            self.pred_depth_vec =  tf.layers.dense(inputs=depth_vec,
                                     units=output_size,
                                     kernel_initializer=tf.contrib.layers.xavier_initializer(),
                                     reuse=False)
@@ -464,25 +466,30 @@ class DDPG(object):
 
 
 
-        pred_depth_grads_tf = tf.gradients(self.pred_depth_loss, self._vars('pred_depth')+self._vars('rgb'))
+        # pred_depth_grads_tf = tf.gradients(self.pred_depth_loss, self._vars('pred_depth')+self._vars('rgb'))
+        pred_depth_grads_tf = tf.gradients(self.pred_depth_loss, self._vars('pred_depth'))
         Q_grads_tf = tf.gradients(self.Q_loss_tf, self._vars('main/Q'))
         pi_grads_tf = tf.gradients(self.pi_loss_tf, self._vars('main/pi'))
         feature_grads_tf = tf.gradients(self.pi_loss_tf, self._vars('rgb')+self._vars('depth'))
-        assert len(self._vars('pred_depth')+self._vars('rgb')) == len(pred_depth_grads_tf)
+        # assert len(self._vars('pred_depth')+self._vars('rgb')) == len(pred_depth_grads_tf)
+        assert len(self._vars('pred_depth')) == len(pred_depth_grads_tf)
         assert len(self._vars('main/Q')) == len(Q_grads_tf)
         assert len(self._vars('main/pi')) == len(pi_grads_tf)
         assert len(self._vars('rgb')+self._vars('depth')) == len(feature_grads_tf)
-        self.pred_depth_grads_vars_tf = zip(pred_depth_grads_tf, self._vars('pred_depth')+self._vars('rgb'))
+        # self.pred_depth_grads_vars_tf = zip(pred_depth_grads_tf, self._vars('pred_depth')+self._vars('rgb'))
+        self.pred_depth_grads_vars_tf = zip(pred_depth_grads_tf, self._vars('pred_depth'))
         self.Q_grads_vars_tf = zip(Q_grads_tf, self._vars('main/Q'))
         self.pi_grads_vars_tf = zip(pi_grads_tf, self._vars('main/pi'))
         self.feature_grads_vars_tf = zip(feature_grads_tf, self._vars('rgb')+self._vars('depth'))
-        self.pred_depth_grad_tf = flatten_grads(grads=pred_depth_grads_tf, var_list=self._vars('pred_depth')+self._vars('rgb'))
+        # self.pred_depth_grad_tf = flatten_grads(grads=pred_depth_grads_tf, var_list=self._vars('pred_depth')+self._vars('rgb'))
+        self.pred_depth_grad_tf = flatten_grads(grads=pred_depth_grads_tf, var_list=self._vars('pred_depth'))
         self.Q_grad_tf = flatten_grads(grads=Q_grads_tf, var_list=self._vars('main/Q'))
         self.pi_grad_tf = flatten_grads(grads=pi_grads_tf, var_list=self._vars('main/pi'))
         self.feature_grad_tf = flatten_grads(grads=feature_grads_tf, var_list=self._vars('rgb')+self._vars('depth'))
 
         # optimizers
-        self.pred_depth_adam = MpiAdam(self._vars('pred_depth')+self._vars('rgb'), scale_grad_by_procs=False)
+        # self.pred_depth_adam = MpiAdam(self._vars('pred_depth')+self._vars('rgb'), scale_grad_by_procs=False)
+        self.pred_depth_adam = MpiAdam(self._vars('pred_depth'), scale_grad_by_procs=False)
         self.Q_adam = MpiAdam(self._vars('main/Q'), scale_grad_by_procs=False)
         self.pi_adam = MpiAdam(self._vars('main/pi'), scale_grad_by_procs=False)
         self.feature_adam = MpiAdam(self._vars('rgb')+self._vars('depth'), scale_grad_by_procs=False)
