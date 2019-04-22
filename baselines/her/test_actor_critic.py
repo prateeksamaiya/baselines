@@ -43,10 +43,12 @@ class ActorCritic:
 
         self.depth_vector = self.pred_depth_vec
 
+        self.feature_size = 64
+
         with tf.variable_scope(self.ddpg_scope,reuse=True) as scope:
             with tf.variable_scope('rgb'):
                 # print("name_under_rgb",tf.get_variable_scope().name)
-                self.rgb_vec = features(rgb_img,penulti_linear=256,feature_size=32)
+                self.rgb_vec = features(rgb_img,penulti_linear=256,feature_size=self.feature_size)
 
 
             with tf.variable_scope(self.net_type):
