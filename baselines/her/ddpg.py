@@ -26,7 +26,7 @@ class DDPG(object):
                  Q_lr, pi_lr, norm_eps, norm_clip, max_u, action_l2, clip_obs, scope, T,
                  rollout_batch_size, subtract_goals, relative_goals, clip_pos_returns, clip_return,
                  bc_loss, q_filter, num_demo, demo_batch_size, prm_loss_weight, aux_loss_weight,
-                 sample_transitions, gamma, reuse=False, **kwargs):
+                 sample_transitions, gamma, reuse=False,feature_size=150,other_obs_size=13, **kwargs):
         """Implementation of DDPG that is used in combination with Hindsight Experience Replay (HER).
             Added functionality to use demonstrations for training to Overcome exploration problem.
 
@@ -72,7 +72,7 @@ class DDPG(object):
         self.test_create_actor_critic = import_function("baselines.her.test_actor_critic:ActorCritic")
 
         input_shapes = dims_to_shapes(self.input_dims)
-        flat_image_size = (self.input_dims['o'] - 13)//4
+        flat_image_size = (self.input_dims['o'] - self.other_obs_size)//4
         self.dim_image = int(math.sqrt(flat_image_size))
         self.dimo = self.input_dims['o']
         self.dim_rgb = 3*flat_image_size  # 3 channels
@@ -414,7 +414,7 @@ class DDPG(object):
         assert len(self._vars("main")) == len(self._vars("target"))
 
         #real-depth-network
-        output_size = self.main.feature_size
+        output_size = self.feature_size
         # print(output_size)
         with tf.variable_scope("pred_depth") as vs:
             depth_vec =  tf.layers.dense(inputs=tf.stop_gradient(self.main.rgb_vec),
@@ -517,7 +517,7 @@ class DDPG(object):
         logs += [('stats_o/std', np.mean(self.sess.run([self.other_stats.std])))]
         logs += [('stats_g/mean', np.mean(self.sess.run([self.g_stats.mean])))]
         logs += [('stats_g/std', np.mean(self.sess.run([self.g_stats.std])))]
-        logs += [('pred_depth_loss',self.rd_loss)]
+        logs += [('real_depth_loss',self.rd_loss)]
         # print(self.rd_loss)
 
         if prefix != '' and not prefix.endswith('/'):
