@@ -6,7 +6,7 @@ import tensorflow as tf
 from tensorflow.contrib.staging import StagingArea
 from baselines import logger
 from baselines.her.util import (
-    import_function, store_args, flatten_grads, transitions_in_episode_batch, convert_episode_to_batch_major, process_input,process_input_np)
+    import_function, store_args, flatten_grads, transitions_in_episode_batch, convert_episode_to_batch_major, process_input,process_input_np,nn)
 from baselines.her.normalizer import Normalizer
 from baselines.her.replay_buffer import ReplayBuffer
 from baselines.common.mpi_adam import MpiAdam
@@ -279,7 +279,7 @@ class DDPG(object):
 
     def _grads(self):
         # Avoid feed_dict here for performance!
-        # writer = tf.summary.FileWriter('/home/patrick/Desktop/tensorboard/', self.sess.graph)
+
         critic_loss, actor_loss, Q_grad, pi_grad, pred_depth_grad,feature_grad,rd_loss = self.sess.run([
             self.Q_loss_tf,
             self.main.Q_pi_tf,
@@ -336,6 +336,7 @@ class DDPG(object):
         self.sess.run(self.stage_op, feed_dict=dict(zip(self.buffer_ph_tf, batch)))
 
     def train(self, stage=True):
+        # writer = tf.summary.FileWriter('/home/patrick/Desktop/tensorboard/', self.sess.graph)
         if stage:
             self.stage_batch()
         critic_loss, actor_loss, Q_grad, pi_grad, pred_depth_grad,feature_grad,self.rd_loss= self._grads()
@@ -417,20 +418,21 @@ class DDPG(object):
         output_size = self.feature_size
         # print(output_size)
         with tf.variable_scope("pred_depth") as vs:
-            depth_vec =  tf.layers.dense(inputs=tf.stop_gradient(self.main.rgb_vec),
-                                    units=256,
-                                    activation=tf.nn.relu,
-                                    kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                    reuse=False)
-            depth_vec =  tf.layers.dense(inputs=depth_vec,
-                                    units=256,
-                                    activation=tf.nn.relu,
-                                    kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                    reuse=False)
-            self.pred_depth_vec =  tf.layers.dense(inputs=depth_vec,
-                                    units=output_size,
-                                    kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                    reuse=False)
+            # depth_vec =  tf.layers.dense(inputs=tf.stop_gradient(self.main.rgb_vec),
+            #                         units=256,
+            #                         activation=tf.nn.relu,
+            #                         kernel_initializer=tf.contrib.layers.xavier_initializer(),
+            #                         reuse=False)
+            # depth_vec =  tf.layers.dense(inputs=depth_vec,
+            #                         units=256,
+            #                         activation=tf.nn.relu,
+            #                         kernel_initializer=tf.contrib.layers.xavier_initializer(),
+            #                         reuse=False)
+            # self.pred_depth_vec =  tf.layers.dense(inputs=depth_vec,
+            #                         units=output_size,
+            #                         kernel_initializer=tf.contrib.layers.xavier_initializer(),
+            #                         reuse=False)
+            self.pred_depth_vec = nn(tf.stop_gradient(self.main.rgb_vec), [self.hidden] * self.layers + [output_size], reuse=False)
 
            
         #test_network
