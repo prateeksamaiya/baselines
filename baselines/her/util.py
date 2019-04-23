@@ -92,7 +92,7 @@ def features(input,penulti_linear,feature_size=50):
     
     
     x =  tf.layers.dense(inputs=x,units=penulti_linear,activation=tf.nn.relu,kernel_initializer=tf.contrib.layers.xavier_initializer(),reuse=False)
-    feature =  tf.layers.dense(inputs=x,units=feature_size,activation=tf.nn.relu,kernel_initializer=tf.contrib.layers.xavier_initializer(),reuse=False)
+    feature =  tf.layers.dense(inputs=x,units=feature_size,kernel_initializer=tf.contrib.layers.xavier_initializer(),reuse=False)
 
     # print("after_convolution_feature",feature.get_shape())
 

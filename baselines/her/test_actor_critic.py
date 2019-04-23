@@ -5,7 +5,7 @@ from baselines.her.util import store_args, nn , process_input, features, flat_pr
 
 class ActorCritic:
     @store_args
-    def __init__(self, inputs_tf, dimo,dim_rgb,dim_depth,dim_other,dimg,pred_depth_vec,dimu, max_u, g_stats, hidden,feature_size,layers,net_type="main",ddpg_scope=None,
+    def __init__(self, inputs_tf, dimo,dim_rgb,dim_depth,dim_other,dimg,pred_depth_vec,dimu, max_u, g_stats, hidden,penulti_linear,feature_size,layers,net_type="main",ddpg_scope=None,
                  **kwargs):
         """The actor-critic network and related training code.
 
@@ -47,7 +47,7 @@ class ActorCritic:
         with tf.variable_scope(self.ddpg_scope,reuse=True) as scope:
             with tf.variable_scope('rgb'):
                 # print("name_under_rgb",tf.get_variable_scope().name)
-                self.rgb_vec = features(rgb_img,penulti_linear=256,feature_size=self.feature_size)
+                self.rgb_vec = features(rgb_img,self.penulti_linear,feature_size=self.feature_size)
 
 
             with tf.variable_scope(self.net_type):

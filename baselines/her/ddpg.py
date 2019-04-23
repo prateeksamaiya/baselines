@@ -26,7 +26,7 @@ class DDPG(object):
                  Q_lr, pi_lr, norm_eps, norm_clip, max_u, action_l2, clip_obs, scope, T,
                  rollout_batch_size, subtract_goals, relative_goals, clip_pos_returns, clip_return,
                  bc_loss, q_filter, num_demo, demo_batch_size, prm_loss_weight, aux_loss_weight,
-                 sample_transitions, gamma, reuse=False,feature_size=150,other_obs_size=13, **kwargs):
+                 sample_transitions, gamma, reuse=False,penulti_linear=512,feature_size=256,other_obs_size=13, **kwargs):
         """Implementation of DDPG that is used in combination with Hindsight Experience Replay (HER).
             Added functionality to use demonstrations for training to Overcome exploration problem.
 
@@ -422,7 +422,11 @@ class DDPG(object):
                                     activation=tf.nn.relu,
                                     kernel_initializer=tf.contrib.layers.xavier_initializer(),
                                     reuse=False)
-                                    
+            depth_vec =  tf.layers.dense(inputs=depth_vec,
+                                    units=256,
+                                    activation=tf.nn.relu,
+                                    kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                                    reuse=False)
             self.pred_depth_vec =  tf.layers.dense(inputs=depth_vec,
                                     units=output_size,
                                     kernel_initializer=tf.contrib.layers.xavier_initializer(),
