@@ -64,6 +64,10 @@ class DDPG(object):
             aux_loss_weight: Weight corresponding to the auxilliary loss also called the cloning loss
 
         """
+        self.train_steps = 0
+
+        self.mean_rd_loss = 0.0
+
         if self.clip_return is None:
             self.clip_return = np.inf
 
@@ -335,12 +339,20 @@ class DDPG(object):
         assert len(self.buffer_ph_tf) == len(batch)
         self.sess.run(self.stage_op, feed_dict=dict(zip(self.buffer_ph_tf, batch)))
 
+    def update_rd_loss(self,rdloss):
+        self.train_steps += 1
+        self.mean_rd_loss += (rdloss - self.mean_rd_loss)/self.train_steps 
+
     def train(self, stage=True):
         # writer = tf.summary.FileWriter('/home/patrick/Desktop/tensorboard/', self.sess.graph)
         if stage:
             self.stage_batch()
-        critic_loss, actor_loss, Q_grad, pi_grad, pred_depth_grad,feature_grad,self.rd_loss= self._grads()
+        critic_loss, actor_loss, Q_grad, pi_grad, pred_depth_grad,feature_grad,rd_loss= self._grads()
         self._update(Q_grad, pi_grad, pred_depth_grad,feature_grad)
+
+        #updating mean of real-depth loss
+        self.update_rd_loss(rd_loss)
+
         # print(self._vars("rgb"))
         # print(self._vars("rgb")[-1].eval()[0])
         # print(self._vars("rgb")[0].eval()[0][0][0][0])
@@ -523,8 +535,11 @@ class DDPG(object):
         logs += [('stats_o/std', np.mean(self.sess.run([self.other_stats.std])))]
         logs += [('stats_g/mean', np.mean(self.sess.run([self.g_stats.mean])))]
         logs += [('stats_g/std', np.mean(self.sess.run([self.g_stats.std])))]
-        logs += [('real_depth_loss',self.rd_loss)]
-        # print(self.rd_loss)
+        logs += [('real_depth_loss',self.mean_rd_loss)]
+        
+        #reintialise
+        self.mean_rd_loss = 0.0
+        self.train_steps = 0
 
         if prefix != '' and not prefix.endswith('/'):
             return [(prefix + '/' + key, val) for key, val in logs]
