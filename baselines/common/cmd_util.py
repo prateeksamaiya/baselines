@@ -148,6 +148,7 @@ def common_arg_parser():
     parser.add_argument('--world', default="basic_with_target",help='training or test environment name --world=pillar or basic with_target default: basic_with_target',type=str)
     parser.add_argument('--mav', default="bebop2",help='drone_name --mav=bebop2 or firefly etc',type=str)
     parser.add_argument('--gui', default="false",help='true or false --gui=true or false default value : false',type=str)
+    parser.add_argument('--use_laser', default="false",help='true or false --gui=true or false default value : false',type=str)
     parser.add_argument('--launch', default="rpyt",help='controller name --launch=rpyt or motor_speed or position  default:rpyt',type=str)
     parser.add_argument('--play', default=False, action='store_true')
     parser.add_argument('--extra_import', help='Extra module to import to access external environments', type=str, default=None)
