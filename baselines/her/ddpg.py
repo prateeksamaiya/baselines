@@ -221,7 +221,7 @@ class DDPG(object):
                 transitions['o'], transitions['g'] = self._preprocess_og(o, ag, g)
                 # No need to preprocess the o_2 and g_2 since this is only used for stats
 
-                rgb_img,depth_img,other = process_input_np(transitions['o'],size=self.dim_image)
+                rgb_img,depth_img,other = process_input(transitions['o'],size=self.dim_image)
                 self.rgb_stats.update(rgb_img)
                 self.depth_stats.update(depth_img)
                 self.other_stats.update(other)
