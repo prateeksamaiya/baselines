@@ -11,6 +11,7 @@ from baselines.common import set_global_seeds, tf_util
 from baselines.common.mpi_moments import mpi_moments
 import baselines.her.experiment.config as config
 from baselines.her.rollout import RolloutWorker
+import tensorflow as tf
 
 def mpi_average(value):
     if not isinstance(value, list):
@@ -237,11 +238,12 @@ def learn(*, network, env, total_timesteps,
     n_cycles = params['n_cycles']
     n_epochs = total_timesteps // n_cycles // rollout_worker.T // rollout_worker.rollout_batch_size
 
-    return train(
-        save_path=save_path, policy=policy, rollout_worker=rollout_worker,
-        evaluator=evaluator, n_epochs=n_epochs, n_test_rollouts=params['n_test_rollouts'],
-        n_cycles=params['n_cycles'], n_batches=params['n_batches'],
-        policy_save_interval=policy_save_interval, demo_file=demo_file)
+    with tf.device('/device:GPU:0'):
+        return train(
+            save_path=save_path, policy=policy, rollout_worker=rollout_worker,
+            evaluator=evaluator, n_epochs=n_epochs, n_test_rollouts=params['n_test_rollouts'],
+            n_cycles=params['n_cycles'], n_batches=params['n_batches'],
+            policy_save_interval=policy_save_interval, demo_file=demo_file)
 
 
 @click.command()
