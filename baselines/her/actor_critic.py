@@ -5,8 +5,7 @@ from baselines.her.util import store_args, nn , process_input, features, flat_pr
 
 class ActorCritic:
     @store_args
-    def __init__(self, inputs_tf, dimo,dim_rgb,dim_depth,dim_other,dimg, dimu, max_u, g_stats,penulti_linear,feature_size,hidden, layers,ddpg_scope=None,
-                 **kwargs):
+    def __init__(self, inputs_tf, dimo,dim_rgb,dim_depth,dim_other,dimg, dimu, max_u, g_stats,penulti_linear,feature_size,hidden, layers,**kwargs):
         """The actor-critic network and related training code.
 
         Args:
@@ -39,31 +38,23 @@ class ActorCritic:
         
         self.rgb_img = tf.reshape(rgb_img,[-1,self.dim_image,self.dim_image,3])
         self.depth_img = tf.reshape(depth_img,[-1,self.dim_image,self.dim_image,1])
-    
-
-        R_use = False
-        if tf.get_variable_scope().name == "ddpg/target":
-            R_use = True
 
 
-        with tf.variable_scope(self.ddpg_scope,reuse=R_use):
-            with tf.variable_scope('rgb') as vs:
-                # print("actor_critic_rgb..............",tf.get_variable_scope().name)
-                self.rgb_vec = features(self.rgb_img,self.penulti_linear,feature_size=self.feature_size)
-                # vs.reuse_variables()
-            with tf.variable_scope('depth') as vs:
-                # print("actor_critic_depth..............",tf.get_variable_scope().name)
-                self.depth_vec = features(self.depth_img,self.penulti_linear,feature_size=self.feature_size)
-                # vs.reuse_variables()
-
-        # print(self.feature_size)
-       
-        # print(self.hidden,self.layers)
-
-        self.input_pi = tf.concat(axis=1, values=[self.rgb_vec,self.depth_vec,self.other, g])  # for actor
         with tf.variable_scope('pi'):
+
             # Networks.
+            with tf.variable_scope('rgb'):
+                print("actor_critic_rgb..............",tf.get_variable_scope().name)
+                self.rgb_vec = features(self.rgb_img,self.penulti_linear,feature_size=self.feature_size)
+            
+            with tf.variable_scope('depth'):
+                print("actor_critic_depth..............",tf.get_variable_scope().name)
+                self.depth_vec = features(self.depth_img,self.penulti_linear,feature_size=self.feature_size)
+            
+            self.input_pi = tf.concat(axis=1, values=[self.rgb_vec,self.depth_vec,self.other, g])  # for actor
+
             self.pi_tf = self.max_u * tf.tanh(nn(self.input_pi, [self.hidden] * self.layers + [self.dimu]))
+
         with tf.variable_scope('Q'):
             # for policy training
             input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec),tf.stop_gradient(self.depth_vec),self.other, g, self.pi_tf / self.max_u]) #stop gradient used

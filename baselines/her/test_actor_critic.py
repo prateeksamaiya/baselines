@@ -5,8 +5,7 @@ from baselines.her.util import store_args, nn , process_input, features, flat_pr
 
 class ActorCritic:
     @store_args
-    def __init__(self, inputs_tf, dimo,dim_rgb,dim_depth,dim_other,dimg,pred_depth_vec,dimu, max_u, g_stats, hidden,penulti_linear,feature_size,layers,net_type="main",ddpg_scope=None,
-                 **kwargs):
+    def __init__(self, inputs_tf, dimo,dim_rgb,dim_depth,dim_other,dimg, dimu, max_u, g_stats,penulti_linear,feature_size,hidden, layers,**kwargs):
         """The actor-critic network and related training code.
 
         Args:
@@ -32,31 +31,38 @@ class ActorCritic:
         # Prepare inputs for actor and critic.
         rgb_img = self.rgb_stats.normalize(rgb_tf)
         depth_img = self.depth_stats.normalize(depth_tf)
-        other = self.other_stats.normalize(other_tf)
+        self.other = self.other_stats.normalize(other_tf)
         g = self.g_stats.normalize(self.g_tf)
 
       
-        rgb_img = tf.reshape(rgb_img,[-1,self.dim_image,self.dim_image,3])
-        depth_img = tf.reshape(depth_img,[-1,self.dim_image,self.dim_image,1])
-    
-
-
-        self.depth_vector = self.pred_depth_vec
-
-
-        with tf.variable_scope(self.ddpg_scope,reuse=True) as scope:
-            with tf.variable_scope('rgb'):
-                # print("name_under_rgb",tf.get_variable_scope().name)
-                self.rgb_vec = features(rgb_img,self.penulti_linear,feature_size=self.feature_size)
-
-
-            with tf.variable_scope(self.net_type):
-                with tf.variable_scope('pi'):
-                    # print("name_main/pi",tf.get_variable_scope().name)
-                    input_pi = tf.concat(axis=1, values=[self.rgb_vec,self.depth_vector,other, g])  # for actor
-                    self.pi_tf = self.max_u * tf.tanh(nn(input_pi, [self.hidden] * self.layers + [self.dimu]))
-                with tf.variable_scope('Q'):
-                    # print("name_main/Q",tf.get_variable_scope().name)                    
-                    input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec),tf.stop_gradient(self.depth_vector),other, g, self.pi_tf / self.max_u])
-                    self.Q_pi_tf = nn(input_Q, [self.hidden] * self.layers + [1])               
         
+        self.rgb_img = tf.reshape(rgb_img,[-1,self.dim_image,self.dim_image,3])
+        self.depth_img = tf.reshape(depth_img,[-1,self.dim_image,self.dim_image,1])
+
+        self.depth_vec = self.pred_depth_vec
+
+        with tf.variable_scope('pi'):
+
+            # Networks.
+            with tf.variable_scope('rgb'):
+                print("actor_critic_rgb..............",tf.get_variable_scope().name)
+                self.rgb_vec = features(self.rgb_img,self.penulti_linear,feature_size=self.feature_size)
+            
+            
+            self.input_pi = tf.concat(axis=1, values=[self.rgb_vec,self.depth_vec,self.other, g])  # for actor
+
+            self.pi_tf = self.max_u * tf.tanh(nn(self.input_pi, [self.hidden] * self.layers + [self.dimu]))
+
+        with tf.variable_scope('Q'):
+            # for policy training
+            input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec),tf.stop_gradient(self.depth_vec),self.other, g, self.pi_tf / self.max_u]) #stop gradient used
+            # # print("input_q_shape_before",input_Q.get_shape())
+            # input_Q = tf.concat(axis=1, values=[o, g, self.pi_tf / self.max_u])
+            self.Q_pi_tf = nn(input_Q, [self.hidden] * self.layers + [1])               
+            # self.Q_pi_tf = nn(input_Q, [self.hidden] * self.layers + [1])               
+            # for critic training
+            # input_Q = tf.concat(axis=1, values=[o, g, self.u_tf / self.max_u])
+            input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec),tf.stop_gradient(self.depth_vec),self.other,g, self.u_tf / self.max_u]) #stop gradient used
+            # print("input_q_shape_later",input_Q.get_shape())
+            self._input_Q = input_Q  # exposed for tests
+            self.Q_tf = nn(input_Q, [self.hidden] * self.layers + [1], reuse=True)
