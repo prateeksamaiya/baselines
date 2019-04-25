@@ -432,7 +432,7 @@ class DDPG(object):
             #                         units=output_size,
             #                         kernel_initializer=tf.contrib.layers.xavier_initializer(),
             #                         reuse=False)
-            self.pred_depth_vec = nn(tf.stop_gradient(self.main.rgb_vec), [self.hidden] * self.layers + [output_size], reuse=False)
+            self.pred_depth_vec = nn(tf.stop_gradient(self.main.rgb_vec), [self.hidden-1] * self.layers + [output_size], reuse=False)
 
            
         #test_network
