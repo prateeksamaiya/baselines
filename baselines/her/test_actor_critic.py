@@ -45,7 +45,7 @@ class ActorCritic:
 
             # Networks.
             with tf.variable_scope('rgb'):
-                print("actor_critic_rgb..............",tf.get_variable_scope().name)
+                # print("actor_critic_rgb..............",tf.get_variable_scope().name)
                 self.rgb_vec = features(self.rgb_img,self.penulti_linear,feature_size=self.feature_size)
             
             

@@ -44,11 +44,11 @@ class ActorCritic:
 
             # Networks.
             with tf.variable_scope('rgb'):
-                print("actor_critic_rgb..............",tf.get_variable_scope().name)
+                # print("actor_critic_rgb..............",tf.get_variable_scope().name)
                 self.rgb_vec = features(self.rgb_img,self.penulti_linear,feature_size=self.feature_size)
             
             with tf.variable_scope('depth'):
-                print("actor_critic_depth..............",tf.get_variable_scope().name)
+                # print("actor_critic_depth..............",tf.get_variable_scope().name)
                 self.depth_vec = features(self.depth_img,self.penulti_linear,feature_size=self.feature_size)
             
             self.input_pi = tf.concat(axis=1, values=[self.rgb_vec,self.depth_vec,self.other, g])  # for actor
