@@ -6,7 +6,7 @@ import tensorflow as tf
 from tensorflow.contrib.staging import StagingArea
 from baselines import logger
 from baselines.her.util import (
-    import_function, store_args, flatten_grads, transitions_in_episode_batch, convert_episode_to_batch_major, process_input,process_input_np,nn)
+    import_function, store_args, flatten_grads, transitions_in_episode_batch, convert_episode_to_batch_major,flat_process_input,nn)
 from baselines.her.normalizer import Normalizer
 from baselines.her.replay_buffer import ReplayBuffer
 from baselines.common.mpi_adam import MpiAdam
@@ -221,7 +221,7 @@ class DDPG(object):
                 transitions['o'], transitions['g'] = self._preprocess_og(o, ag, g)
                 # No need to preprocess the o_2 and g_2 since this is only used for stats
 
-                rgb_img,depth_img,other = process_input(transitions['o'],size=self.dim_image)
+                rgb_img,depth_img,other = flat_process_input(transitions['o'],size=self.dim_image)
                 self.rgb_stats.update(rgb_img)
                 self.depth_stats.update(depth_img)
                 self.other_stats.update(other)
@@ -261,7 +261,7 @@ class DDPG(object):
             # self.o_stats.recompute_stats()
             # self.g_stats.recompute_stats()
 
-            rgb_img,depth_img,other = process_input_np(transitions['o'],size=self.dim_image)
+            rgb_img,depth_img,other = flat_process_input(transitions['o'],size=self.dim_image)
             self.rgb_stats.update(rgb_img)
             self.depth_stats.update(depth_img)
             self.other_stats.update(other)
