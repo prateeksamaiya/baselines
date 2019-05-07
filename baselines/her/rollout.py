@@ -139,6 +139,8 @@ class RolloutWorker:
 
         # stats
         # print(len(successes))
+        # print(self.rollout_batch_size)
+        # print(successes)
         successful = np.array(successes)[-1, :]
         assert successful.shape == (self.rollout_batch_size,)
         success_rate = np.mean(successful)

@@ -46,28 +46,28 @@ def import_function(spec):
     fn = getattr(module, fn_name)
     return fn
 
-def process_input_np(x,size=100):
-    # print("process input size",x.get_shape())
-    img_len = size*size
-    rgb_image = np.reshape(x[:,:img_len*3],[-1,size,size,3])
-    depth_image = np.reshape(x[:,img_len*3:4*img_len],[-1,size,size,1])
-    other = x[:,4*img_len:]
-    return rgb_image, depth_image, other
     
-def process_input(x,size=100):
-    # print("process input size",x.get_shape())
-    img_len = size*size
-    rgb_image = tf.reshape(x[:,:img_len*3],[-1,size,size,3])
-    depth_image = tf.reshape(x[:,img_len*3:4*img_len],[-1,size,size,1])
-    other = x[:,4*img_len:]
-    return rgb_image, depth_image, other
 
 def flat_process_input(x,size=100):
-    # print("process input size",x.get_shape())
+    size_o = tf.size(x[0])//3
+    x = tf.reshape(x,[-1,3,size_o])
+    x = tf.transpose(x,[0,2,1])
+    # print("x = ",x.get_shape().as_list())
     img_len = size*size
-    rgb_image = x[:,:img_len*3]
-    depth_image = x[:,img_len*3:4*img_len]
-    other = x[:,4*img_len:]
+    rgb_image = tf.reshape(x[:,:img_len*3,:],[-1,9*img_len])
+    depth_image = tf.reshape(x[:,img_len*3:4*img_len,:],[-1,3*img_len])
+    other = tf.reshape(x[:,4*img_len:,:],[-1,3*(size_o - 4*img_len)])
+   
+    return rgb_image, depth_image, other
+
+def flat_process_input_np(x,size=100):
+    size_o = len(x[0])//3
+    x = x.reshape([-1,3,size_o])
+    x = x.transpose([0,2,1])
+    img_len = size*size
+    rgb_image = x[:,:img_len*3,:].reshape([-1,9*img_len])
+    depth_image = x[:,img_len*3:4*img_len,:].reshape([-1,3*img_len])
+    other = x[:,4*img_len:,:].reshape([-1,3*(size_o - 4*img_len)])
     return rgb_image, depth_image, other
 
 def flatten_grads(var_list, grads):

@@ -1,5 +1,5 @@
 import tensorflow as tf
-from baselines.her.util import store_args, nn , process_input, features, flat_process_input
+from baselines.her.util import store_args, nn , features, flat_process_input,flat_process_input_np
 # from baselines.her.model import features
 
 
@@ -26,18 +26,18 @@ class ActorCritic:
         self.u_tf = inputs_tf['u']
 
 
-        rgb_tf,depth_tf,other_tf = flat_process_input(self.o_tf,size=self.dim_image)
+        self.rgb_tf,self.depth_tf,self.other_tf = flat_process_input(self.o_tf,size=self.dim_image)
 
         # Prepare inputs for actor and critic.
-        rgb_img = self.rgb_stats.normalize(rgb_tf)
-        depth_img = self.depth_stats.normalize(depth_tf)
-        self.other = self.other_stats.normalize(other_tf)
+        rgb_img = self.rgb_stats.normalize(self.rgb_tf)
+        depth_img = self.depth_stats.normalize(self.depth_tf)
+        self.other = self.other_stats.normalize(self.other_tf)
         g = self.g_stats.normalize(self.g_tf)
 
       
         
-        self.rgb_img = tf.reshape(rgb_img,[-1,self.dim_image,self.dim_image,3])
-        self.depth_img = tf.reshape(depth_img,[-1,self.dim_image,self.dim_image,1])
+        self.rgb_img = tf.reshape(rgb_img,[-1,self.dim_image,self.dim_image,9])
+        self.depth_img = tf.reshape(depth_img,[-1,self.dim_image,self.dim_image,3])
 
 
         with tf.variable_scope('pi'):

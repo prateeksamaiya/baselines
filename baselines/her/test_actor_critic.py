@@ -1,5 +1,5 @@
 import tensorflow as tf
-from baselines.her.util import store_args, nn , process_input, features, flat_process_input
+from baselines.her.util import store_args, nn , features, flat_process_input
 # from baselines.her.model import features
 
 
@@ -36,8 +36,8 @@ class ActorCritic:
 
       
         
-        self.rgb_img = tf.reshape(rgb_img,[-1,self.dim_image,self.dim_image,3])
-        self.depth_img = tf.reshape(depth_img,[-1,self.dim_image,self.dim_image,1])
+        self.rgb_img = tf.reshape(rgb_img,[-1,self.dim_image,self.dim_image,9])
+        self.depth_img = tf.reshape(depth_img,[-1,self.dim_image,self.dim_image,3])
 
         self.depth_vec = self.pred_depth_vec
 

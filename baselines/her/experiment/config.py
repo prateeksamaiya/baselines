@@ -23,7 +23,11 @@ DEFAULT_PARAMS = {
     'network_class': 'baselines.her.actor_critic:ActorCritic',
     'Q_lr': 0.001,  # critic learning rate
     'pi_lr': 0.001,  # actor learning rate
+<<<<<<< Updated upstream
     'buffer_size': int(2E5),  # for experience replay
+=======
+    'buffer_size': int(1E5),  # for experience replay
+>>>>>>> Stashed changes
     'polyak': 0.95,  # polyak averaging coefficient
     'action_l2': 1.0,  # quadratic penalty on actions (before rescaling by max_u)
     'clip_obs': 200.,

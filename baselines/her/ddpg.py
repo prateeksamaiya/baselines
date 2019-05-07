@@ -6,7 +6,7 @@ import tensorflow as tf
 from tensorflow.contrib.staging import StagingArea
 from baselines import logger
 from baselines.her.util import (
-    import_function, store_args, flatten_grads, transitions_in_episode_batch, convert_episode_to_batch_major,flat_process_input,nn)
+    import_function, store_args, flatten_grads, transitions_in_episode_batch, convert_episode_to_batch_major,flat_process_input,flat_process_input_np,nn)
 from baselines.her.normalizer import Normalizer
 from baselines.her.replay_buffer import ReplayBuffer
 from baselines.common.mpi_adam import MpiAdam
@@ -76,12 +76,14 @@ class DDPG(object):
         self.test_create_actor_critic = import_function("baselines.her.test_actor_critic:ActorCritic")
 
         input_shapes = dims_to_shapes(self.input_dims)
-        flat_image_size = (self.input_dims['o'] - self.other_obs_size)//4
+        print(input_shapes)
+        flat_image_size = (self.input_dims['o']//3 - self.other_obs_size)//4
+        print("flat_image_size",flat_image_size)
         self.dim_image = int(math.sqrt(flat_image_size))
         self.dimo = self.input_dims['o']
-        self.dim_rgb = 3*flat_image_size  # 3 channels
-        self.dim_depth = flat_image_size
-        self.dim_other = self.other_obs_size
+        self.dim_rgb = 3*3*flat_image_size # 3 channels and 3 images concatenated
+        self.dim_depth = 3*flat_image_size
+        self.dim_other = 3*self.other_obs_size
         self.dimg = self.input_dims['g']
         self.dimu = self.input_dims['u']
 
@@ -221,10 +223,10 @@ class DDPG(object):
                 transitions['o'], transitions['g'] = self._preprocess_og(o, ag, g)
                 # No need to preprocess the o_2 and g_2 since this is only used for stats
 
-                rgb_img,depth_img,other = flat_process_input(transitions['o'],size=self.dim_image)
-                self.rgb_stats.update(rgb_img)
-                self.depth_stats.update(depth_img)
-                self.other_stats.update(other)
+                rgb_tf,depth_tf,other_tf = flat_process_input_np(transitions['o'],size=self.dim_image)
+                self.rgb_stats.update(rgb_tf)
+                self.depth_stats.update(depth_tf)
+                self.other_stats.update(other_tf)
                 self.g_stats.update(transitions['g'])
 
                 self.rgb_stats.recompute_stats()
@@ -261,10 +263,10 @@ class DDPG(object):
             # self.o_stats.recompute_stats()
             # self.g_stats.recompute_stats()
 
-            rgb_img,depth_img,other = flat_process_input(transitions['o'],size=self.dim_image)
-            self.rgb_stats.update(rgb_img)
-            self.depth_stats.update(depth_img)
-            self.other_stats.update(other)
+            rgb_tf,depth_tf,other_tf = flat_process_input_np(transitions['o'],size=self.dim_image)
+            self.rgb_stats.update(rgb_tf)
+            self.depth_stats.update(depth_tf)
+            self.other_stats.update(other_tf)
             self.g_stats.update(transitions['g'])
 
             self.rgb_stats.recompute_stats()
@@ -283,7 +285,7 @@ class DDPG(object):
 
     def _grads(self):
         # Avoid feed_dict here for performance!
-
+        
         critic_loss, actor_loss, Q_grad, pi_grad, pred_depth_grad,rd_loss = self.sess.run([
             self.Q_loss_tf,
             self.main.Q_pi_tf,
@@ -294,19 +296,6 @@ class DDPG(object):
         ])
         return critic_loss, actor_loss, Q_grad, pi_grad , pred_depth_grad,rd_loss
 
-        # self.feature_grad_tf,
-        # self.main.o_tf,
-        # self.main.rgb_img,
-        # self.main.depth_img,
-        # self.main.other,
-        # self.main.input_pi,
-        # print(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='ddpg/main/pi'))
-        # assert(False)
-        # print(inp.shape,inp[0])
-        # print(r.shape,r[0])
-        # print(d.shape,d[0])
-        # print(o.shape,o[0])
-        # print(pi_input.shape,pi_input[0])
 
     def _update(self, Q_grad, pi_grad, pred_depth_grad):
         self.Q_adam.update(Q_grad, self.Q_lr)
@@ -411,7 +400,7 @@ class DDPG(object):
         #choose only the demo buffer samples
         mask = np.concatenate((np.zeros(self.batch_size - self.demo_batch_size), np.ones(self.demo_batch_size)), axis = 0)
         
-
+        print("printint.......................................")
         # networks
         with tf.variable_scope('main') as vs:
             if reuse:
