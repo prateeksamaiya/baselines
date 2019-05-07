@@ -81,7 +81,7 @@ class DDPG(object):
         self.dimo = self.input_dims['o']
         self.dim_rgb = 3*flat_image_size  # 3 channels
         self.dim_depth = flat_image_size
-        self.dim_other = 13
+        self.dim_other = self.other_obs_size
         self.dimg = self.input_dims['g']
         self.dimu = self.input_dims['u']
 
