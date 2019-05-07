@@ -37,6 +37,8 @@ class RolloutWorker:
         self.info_keys = [key.replace('info_', '') for key in dims.keys() if key.startswith('info_')]
 
         self.success_history = deque(maxlen=history_len)
+        self.collision_history = deque(maxlen=history_len)
+        self.epi_len_history = deque(maxlen=history_len)
         self.Q_history = deque(maxlen=history_len)
 
         self.n_episodes = 0
@@ -62,7 +64,7 @@ class RolloutWorker:
         ag[:] = self.initial_ag
 
         # generate episodes
-        obs, achieved_goals, acts, goals, successes = [], [], [], [], []
+        obs, achieved_goals, acts, goals, successes, all_collisions = [], [], [], [], [], []
         dones = []
         info_values = [np.empty((self.T - 1, self.rollout_batch_size, self.dims['info_' + key]), np.float32) for key in self.info_keys]
         Qs = []
@@ -94,6 +96,7 @@ class RolloutWorker:
             o_new = obs_dict_new['observation']
             ag_new = obs_dict_new['achieved_goal']
             success = np.array([i.get('is_success', 0.0) for i in info])
+            collision = np.array([i.get('collision', 0.0) for i in info])
             
 
             if any(done):
@@ -120,6 +123,7 @@ class RolloutWorker:
             obs.append(o.copy())
             achieved_goals.append(ag.copy())
             successes.append(success.copy())
+            all_collisions.append(collision.copy())
             acts.append(u.copy())
             goals.append(self.g.copy())
             o[...] = o_new
@@ -138,13 +142,19 @@ class RolloutWorker:
             episode['info_{}'.format(key)] = value[:t]
 
         # stats
+        print(t)
         # print(len(successes))
         # print(self.rollout_batch_size)
         # print(successes)
-        successful = np.array(successes)[-1, :]
+
+        # successful = np.array(successes)[-1, :]
+        successful = np.array([np.array(successes).any()])
         assert successful.shape == (self.rollout_batch_size,)
         success_rate = np.mean(successful)
+        collision_rate = np.mean(np.array(all_collisions))
+        self.collision_history.append(collision_rate)
         self.success_history.append(success_rate)
+        self.epi_len_history.append(t+1)
         if self.compute_Q:
             self.Q_history.append(np.mean(Qs))
         self.n_episodes += self.rollout_batch_size
@@ -155,10 +165,15 @@ class RolloutWorker:
         """Clears all histories that are used for statistics
         """
         self.success_history.clear()
+        self.collision_history.clear()
+        self.epi_len_history.clear()
         self.Q_history.clear()
 
     def current_success_rate(self):
         return np.mean(self.success_history)
+    
+    def current_collision_rate(self):
+        return np.mean(self.collision_history)
 
     def current_mean_Q(self):
         return np.mean(self.Q_history)
@@ -174,6 +189,8 @@ class RolloutWorker:
         """
         logs = []
         logs += [('success_rate', np.mean(self.success_history))]
+        logs += [('collision_rate', np.mean(self.collision_history))]
+        logs += [('episode_length', np.mean(self.epi_len_history))]
         if self.compute_Q:
             logs += [('mean_Q', np.mean(self.Q_history))]
         logs += [('episode', self.n_episodes)]

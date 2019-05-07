@@ -26,7 +26,7 @@ class DDPG(object):
                  Q_lr, pi_lr, norm_eps, norm_clip, max_u, action_l2, clip_obs, scope, T,
                  rollout_batch_size, subtract_goals, relative_goals, clip_pos_returns, clip_return,
                  bc_loss, q_filter, num_demo, demo_batch_size, prm_loss_weight, aux_loss_weight,
-                 sample_transitions, gamma, reuse=False,penulti_linear=512,feature_size=256,other_obs_size=13, **kwargs):
+                 sample_transitions, gamma, reuse=False,penulti_linear=512,feature_size=256,other_obs_size=13,n_concat_images=3, **kwargs):
         """Implementation of DDPG that is used in combination with Hindsight Experience Replay (HER).
             Added functionality to use demonstrations for training to Overcome exploration problem.
 
@@ -77,7 +77,7 @@ class DDPG(object):
 
         input_shapes = dims_to_shapes(self.input_dims)
         print(input_shapes)
-        flat_image_size = (self.input_dims['o']//3 - self.other_obs_size)//4
+        flat_image_size = (self.input_dims['o']//self.n_concat_images - self.other_obs_size)//4
         print("flat_image_size",flat_image_size)
         self.dim_image = int(math.sqrt(flat_image_size))
         self.dimo = self.input_dims['o']
@@ -86,6 +86,7 @@ class DDPG(object):
         self.dim_other = 3*self.other_obs_size
         self.dimg = self.input_dims['g']
         self.dimu = self.input_dims['u']
+        self.dim_rd = 1
 
         # Prepare staging area for feeding data to the model.
         stage_shapes = OrderedDict()
@@ -223,7 +224,7 @@ class DDPG(object):
                 transitions['o'], transitions['g'] = self._preprocess_og(o, ag, g)
                 # No need to preprocess the o_2 and g_2 since this is only used for stats
 
-                rgb_tf,depth_tf,other_tf = flat_process_input_np(transitions['o'],size=self.dim_image)
+                rgb_tf,depth_tf,other_tf = flat_process_input_np(transitions['o'],n_concat_images=self.n_concat_images,size=self.dim_image)
                 self.rgb_stats.update(rgb_tf)
                 self.depth_stats.update(depth_tf)
                 self.other_stats.update(other_tf)
@@ -237,7 +238,7 @@ class DDPG(object):
 
         logger.info("Demo buffer size: ", DEMO_BUFFER.get_current_size()) #print out the demonstration buffer size
 
-    def store_episode(self, episode_batch, update_stats=True):
+    def store_episode(self, episode_batch,update_stats=True):
         """
         episode_batch: array of batch_size x (T or T+1) x dim_key
                        'o' is of size T+1, others are of size T
@@ -263,16 +264,20 @@ class DDPG(object):
             # self.o_stats.recompute_stats()
             # self.g_stats.recompute_stats()
 
-            rgb_tf,depth_tf,other_tf = flat_process_input_np(transitions['o'],size=self.dim_image)
+            rgb_tf,depth_tf,other_tf = flat_process_input_np(transitions['o'],n_concat_images=self.n_concat_images,size=self.dim_image)
             self.rgb_stats.update(rgb_tf)
             self.depth_stats.update(depth_tf)
             self.other_stats.update(other_tf)
             self.g_stats.update(transitions['g'])
+    
+
+
 
             self.rgb_stats.recompute_stats()
             self.depth_stats.recompute_stats()
             self.other_stats.recompute_stats()
             self.g_stats.recompute_stats()
+
 
     def get_current_buffer_size(self):
         return self.buffer.get_current_size()
@@ -294,7 +299,11 @@ class DDPG(object):
             self.pred_depth_grad_tf,
             self.pred_depth_loss,
         ])
-        return critic_loss, actor_loss, Q_grad, pi_grad , pred_depth_grad,rd_loss
+
+        self.rd_stats.update(rd_loss)
+        self.rd_stats.recompute_stats()
+
+        return critic_loss, actor_loss, Q_grad, pi_grad , pred_depth_grad
 
 
     def _update(self, Q_grad, pi_grad, pred_depth_grad):
@@ -331,19 +340,19 @@ class DDPG(object):
         assert len(self.buffer_ph_tf) == len(batch)
         self.sess.run(self.stage_op, feed_dict=dict(zip(self.buffer_ph_tf, batch)))
 
-    def update_rd_loss(self,rdloss):
-        self.train_steps += 1
-        self.mean_rd_loss += (rdloss - self.mean_rd_loss)/self.train_steps 
+    # def update_rd_loss(self,rdloss):
+    #     self.train_steps += 1
+    #     self.mean_rd_loss += (rdloss - self.mean_rd_loss)/self.train_steps 
 
     def train(self, stage=True):
         # writer = tf.summary.FileWriter('/home/patrick/Desktop/tensorboard/', self.sess.graph)
         if stage:
             self.stage_batch()
-        critic_loss, actor_loss, Q_grad, pi_grad, pred_depth_grad,rd_loss= self._grads()
+        critic_loss, actor_loss, Q_grad, pi_grad, pred_depth_grad= self._grads()
         self._update(Q_grad, pi_grad, pred_depth_grad)
 
         #updating mean of real-depth loss
-        self.update_rd_loss(rd_loss)
+        # self.update_rd_loss(rd_loss)
 
         # print(self._vars("rgb"))
         # print(self._vars("rgb")[-1].eval()[0])
@@ -391,6 +400,11 @@ class DDPG(object):
             if reuse:
                 vs.reuse_variables()
             self.g_stats = Normalizer(self.dimg, self.norm_eps, self.norm_clip, sess=self.sess)
+        with tf.variable_scope('real_depth_loss') as vs:
+            if reuse:
+                vs.reuse_variables()
+            self.rd_stats = Normalizer(self.dim_rd, self.norm_eps, self.norm_clip, sess=self.sess)
+    
 
         # mini-batch sampling.
         batch = self.staging_tf.get()
@@ -515,11 +529,12 @@ class DDPG(object):
         logs += [('stats_o/std', np.mean(self.sess.run([self.other_stats.std])))]
         logs += [('stats_g/mean', np.mean(self.sess.run([self.g_stats.mean])))]
         logs += [('stats_g/std', np.mean(self.sess.run([self.g_stats.std])))]
-        logs += [('real_depth_loss',self.mean_rd_loss)]
+        logs += [('stats_real_depth_loss/mean', np.mean(self.sess.run([self.rd_stats.mean])))]
+        logs += [('stats_real_depth_loss/std', np.mean(self.sess.run([self.rd_stats.std])))]
         
         #reintialise
-        self.mean_rd_loss = 0.0
-        self.train_steps = 0
+        # self.mean_rd_loss = 0.0
+        # self.train_steps = 0
 
         if prefix != '' and not prefix.endswith('/'):
             return [(prefix + '/' + key, val) for key, val in logs]

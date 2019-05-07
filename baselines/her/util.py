@@ -60,8 +60,8 @@ def flat_process_input(x,size=100):
    
     return rgb_image, depth_image, other
 
-def flat_process_input_np(x,size=100):
-    size_o = len(x[0])//3
+def flat_process_input_np(x,size=100,n_concat_images=3):
+    size_o = len(x[0])//n_concat_images
     x = x.reshape([-1,3,size_o])
     x = x.transpose([0,2,1])
     img_len = size*size
