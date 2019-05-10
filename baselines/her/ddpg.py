@@ -77,13 +77,13 @@ class DDPG(object):
 
         input_shapes = dims_to_shapes(self.input_dims)
         print(input_shapes)
-        flat_image_size = (self.input_dims['o']//self.n_concat_images - self.other_obs_size)//4
+        flat_image_size = (self.input_dims['o'] - self.other_obs_size)//self.n_concat_images//4
         print("flat_image_size",flat_image_size)
         self.dim_image = int(math.sqrt(flat_image_size))
         self.dimo = self.input_dims['o']
         self.dim_rgb = 3*3*flat_image_size # 3 channels and 3 images concatenated
         self.dim_depth = 3*flat_image_size
-        self.dim_other = 3*self.other_obs_size
+        self.dim_other = self.other_obs_size
         self.dimg = self.input_dims['g']
         self.dimu = self.input_dims['u']
         self.dim_rd = 1

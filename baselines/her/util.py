@@ -49,25 +49,28 @@ def import_function(spec):
     
 
 def flat_process_input(x,size=100,n_concat_images=3):
-    size_o = tf.size(x[0])//n_concat_images
-    x = tf.reshape(x,[-1,3,size_o])
+    img_len = size*size
+    real_depth = 4*img_len
+    size_all_images = 3*real_depth
+    other = x[:,size_all_images:]
+    x = x[:,:size_all_images]
+    x = tf.reshape(x,[-1,n_concat_images,real_depth])
     x = tf.transpose(x,[0,2,1])
     # print("x = ",x.get_shape().as_list())
-    img_len = size*size
     rgb_image = tf.reshape(x[:,:img_len*3,:],[-1,9*img_len])
     depth_image = tf.reshape(x[:,img_len*3:4*img_len,:],[-1,3*img_len])
-    other = tf.reshape(x[:,4*img_len:,:],[-1,3*(size_o - 4*img_len)])
-   
     return rgb_image, depth_image, other
 
 def flat_process_input_np(x,size=100,n_concat_images=3):
-    size_o = len(x[0])//n_concat_images
-    x = x.reshape([-1,3,size_o])
-    x = x.transpose([0,2,1])
     img_len = size*size
+    real_depth = 4*img_len
+    size_all_images = 3*real_depth
+    other = x[:,size_all_images:]
+    x = x[:,:size_all_images]
+    x = x.reshape([-1,n_concat_images,real_depth])
+    x = x.transpose([0,2,1])
     rgb_image = x[:,:img_len*3,:].reshape([-1,9*img_len])
     depth_image = x[:,img_len*3:4*img_len,:].reshape([-1,3*img_len])
-    other = x[:,4*img_len:,:].reshape([-1,3*(size_o - 4*img_len)])
     return rgb_image, depth_image, other
 
 def flatten_grads(var_list, grads):
