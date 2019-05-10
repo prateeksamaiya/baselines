@@ -154,8 +154,8 @@ class RolloutWorker:
         # print(self.rollout_batch_size)
         # print(successes)
 
-        # successful = np.array(successes)[-1, :]
-        successful = np.array([np.array(successes).any()])
+        successful = np.array(successes)[-1, :]
+        # successful = np.array([np.array(successes).any()])
         assert successful.shape == (self.rollout_batch_size,)
         success_rate = np.mean(successful)
         collision_rate = np.mean(np.array(all_collisions))

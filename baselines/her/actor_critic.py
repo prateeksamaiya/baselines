@@ -51,20 +51,21 @@ class ActorCritic:
                 # print("actor_critic_depth..............",tf.get_variable_scope().name)
                 self.depth_vec = features(self.depth_img,self.penulti_linear,feature_size=self.feature_size)
             
-            self.input_pi = tf.concat(axis=1, values=[self.rgb_vec,self.depth_vec,self.other, g])  # for actor
+            self.input_pi = tf.concat(axis=1, values=[self.rgb_vec,g])  # for actor
 
             self.pi_tf = self.max_u * tf.tanh(nn(self.input_pi, [self.hidden] * self.layers + [self.dimu]))
 
         with tf.variable_scope('Q'):
             # for policy training
-            input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec),tf.stop_gradient(self.depth_vec),self.other, g, self.pi_tf / self.max_u]) #stop gradient used
+            # input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec),tf.stop_gradient(self.depth_vec),self.other, g, self.pi_tf / self.max_u]) #stop gradient used
+            input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec), g, self.pi_tf / self.max_u]) #stop gradient used
             # # print("input_q_shape_before",input_Q.get_shape())
             # input_Q = tf.concat(axis=1, values=[o, g, self.pi_tf / self.max_u])
             self.Q_pi_tf = nn(input_Q, [self.hidden] * self.layers + [1])               
             # self.Q_pi_tf = nn(input_Q, [self.hidden] * self.layers + [1])               
             # for critic training
             # input_Q = tf.concat(axis=1, values=[o, g, self.u_tf / self.max_u])
-            input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec),tf.stop_gradient(self.depth_vec),self.other,g, self.u_tf / self.max_u]) #stop gradient used
+            input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec),g, self.u_tf / self.max_u]) #stop gradient used
             # print("input_q_shape_later",input_Q.get_shape())
             self._input_Q = input_Q  # exposed for tests
             self.Q_tf = nn(input_Q, [self.hidden] * self.layers + [1], reuse=True)
