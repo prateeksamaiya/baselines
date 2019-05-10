@@ -414,7 +414,7 @@ class DDPG(object):
         #choose only the demo buffer samples
         mask = np.concatenate((np.zeros(self.batch_size - self.demo_batch_size), np.ones(self.demo_batch_size)), axis = 0)
         
-        print("printint.......................................")
+        # print("printint.......................................")
         # networks
         with tf.variable_scope('main') as vs:
             if reuse:

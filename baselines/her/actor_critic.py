@@ -5,7 +5,7 @@ from baselines.her.util import store_args, nn , features, flat_process_input,fla
 
 class ActorCritic:
     @store_args
-    def __init__(self, inputs_tf, dimo,dim_rgb,dim_depth,dim_other,dimg, dimu, max_u, g_stats,penulti_linear,feature_size,hidden, layers,**kwargs):
+    def __init__(self, inputs_tf, dimo,dim_rgb,dim_depth,dim_other,dimg, dimu, max_u, g_stats,penulti_linear,feature_size,hidden, layers,n_concat_images,**kwargs):
         """The actor-critic network and related training code.
 
         Args:
@@ -26,7 +26,7 @@ class ActorCritic:
         self.u_tf = inputs_tf['u']
 
 
-        self.rgb_tf,self.depth_tf,self.other_tf = flat_process_input(self.o_tf,size=self.dim_image)
+        self.rgb_tf,self.depth_tf,self.other_tf = flat_process_input(self.o_tf,size=self.dim_image,n_concat_images=self.n_concat_images)
 
         # Prepare inputs for actor and critic.
         rgb_img = self.rgb_stats.normalize(self.rgb_tf)

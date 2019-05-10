@@ -48,8 +48,8 @@ def import_function(spec):
 
     
 
-def flat_process_input(x,size=100):
-    size_o = tf.size(x[0])//3
+def flat_process_input(x,size=100,n_concat_images=3):
+    size_o = tf.size(x[0])//n_concat_images
     x = tf.reshape(x,[-1,3,size_o])
     x = tf.transpose(x,[0,2,1])
     # print("x = ",x.get_shape().as_list())
