@@ -286,30 +286,33 @@ class DDPG(object):
         self.Q_adam.sync()
         self.pi_adam.sync()
         # self.feature_adam.sync(),
-        self.pred_depth_adam.sync()
+        # self.pred_depth_adam.sync()
 
     def _grads(self):
         # Avoid feed_dict here for performance!
         
-        critic_loss, actor_loss, Q_grad, pi_grad, pred_depth_grad,rd_loss = self.sess.run([
+        # critic_loss, actor_loss, Q_grad, pi_grad, pred_depth_grad,rd_loss = self.sess.run([
+        critic_loss, actor_loss, Q_grad, pi_grad= self.sess.run([
             self.Q_loss_tf,
             self.main.Q_pi_tf,
             self.Q_grad_tf,
             self.pi_grad_tf,
-            self.pred_depth_grad_tf,
-            self.pred_depth_loss,
+            # self.pred_depth_grad_tf,
+            # self.pred_depth_loss,
         ])
 
-        self.rd_stats.update(rd_loss)
-        self.rd_stats.recompute_stats()
+        # self.rd_stats.update(rd_loss)
+        # self.rd_stats.recompute_stats()
 
-        return critic_loss, actor_loss, Q_grad, pi_grad , pred_depth_grad
+        # return critic_loss, actor_loss, Q_grad, pi_grad , pred_depth_grad
+        return critic_loss, actor_loss, Q_grad, pi_grad 
 
 
-    def _update(self, Q_grad, pi_grad, pred_depth_grad):
+    # def _update(self, Q_grad, pi_grad, pred_depth_grad):
+    def _update(self, Q_grad, pi_grad):
         self.Q_adam.update(Q_grad, self.Q_lr)
         self.pi_adam.update(pi_grad, self.pi_lr)
-        self.pred_depth_adam.update(pred_depth_grad, self.pi_lr)
+        # self.pred_depth_adam.update(pred_depth_grad, self.pi_lr)
         # self.feature_adam.update(feature_grad, self.pi_lr)
 
     def sample_batch(self):
@@ -348,8 +351,10 @@ class DDPG(object):
         # writer = tf.summary.FileWriter('/home/patrick/Desktop/tensorboard/', self.sess.graph)
         if stage:
             self.stage_batch()
-        critic_loss, actor_loss, Q_grad, pi_grad, pred_depth_grad= self._grads()
-        self._update(Q_grad, pi_grad, pred_depth_grad)
+        # critic_loss, actor_loss, Q_grad, pi_grad, pred_depth_grad= self._grads()
+        # self._update(Q_grad, pi_grad, pred_depth_grad)
+        critic_loss, actor_loss, Q_grad, pi_grad= self._grads()
+        self._update(Q_grad, pi_grad)
 
         #updating mean of real-depth loss
         # self.update_rd_loss(rd_loss)
@@ -400,10 +405,10 @@ class DDPG(object):
             if reuse:
                 vs.reuse_variables()
             self.g_stats = Normalizer(self.dimg, self.norm_eps, self.norm_clip, sess=self.sess)
-        with tf.variable_scope('real_depth_loss') as vs:
-            if reuse:
-                vs.reuse_variables()
-            self.rd_stats = Normalizer(self.dim_rd, self.norm_eps, self.norm_clip, sess=self.sess)
+        # with tf.variable_scope('real_depth_loss') as vs:
+        #     if reuse:
+        #         vs.reuse_variables()
+        #     self.rd_stats = Normalizer(self.dim_rd, self.norm_eps, self.norm_clip, sess=self.sess)
     
 
         # mini-batch sampling.
@@ -431,10 +436,10 @@ class DDPG(object):
             vs.reuse_variables()
         assert len(self._vars("main")) == len(self._vars("target"))
 
-        #real-depth-network
-        output_size = self.feature_size
-        with tf.variable_scope("pred_depth") as vs:
-            self.pred_depth_vec = nn(tf.stop_gradient(self.main.rgb_vec), [self.hidden] * self.layers + [output_size], reuse=False)
+        # #real-depth-network
+        # output_size = self.feature_size
+        # with tf.variable_scope("pred_depth") as vs:
+        #     self.pred_depth_vec = nn(tf.stop_gradient(self.main.rgb_vec), [self.hidden] * self.layers + [output_size], reuse=False)
 
         
             
@@ -474,34 +479,34 @@ class DDPG(object):
 
         
         #pred_depth_loss
-        self.pred_depth_loss = tf.losses.mean_squared_error(tf.stop_gradient(self.main.depth_vec),self.pred_depth_vec)
+        # self.pred_depth_loss = tf.losses.mean_squared_error(tf.stop_gradient(self.main.depth_vec),self.pred_depth_vec)
 
 
 
         # pred_depth_grads_tf = tf.gradients(self.pred_depth_loss, self._vars('pred_depth')+self._vars('rgb'))
-        pred_depth_grads_tf = tf.gradients(self.pred_depth_loss, self._vars('pred_depth'))
+        # pred_depth_grads_tf = tf.gradients(self.pred_depth_loss, self._vars('pred_depth'))
         Q_grads_tf = tf.gradients(self.Q_loss_tf, self._vars('main/Q'))
         pi_grads_tf = tf.gradients(self.pi_loss_tf, self._vars('main/pi'))
         # feature_grads_tf = tf.gradients(self.pi_loss_tf, self._vars('rgb')+self._vars('depth'))
         # assert len(self._vars('pred_depth')+self._vars('rgb')) == len(pred_depth_grads_tf)
-        assert len(self._vars('pred_depth')) == len(pred_depth_grads_tf)
+        # assert len(self._vars('pred_depth')) == len(pred_depth_grads_tf)
         assert len(self._vars('main/Q')) == len(Q_grads_tf)
         assert len(self._vars('main/pi')) == len(pi_grads_tf)
         # assert len(self._vars('rgb')+self._vars('depth')) == len(feature_grads_tf)
         # self.pred_depth_grads_vars_tf = zip(pred_depth_grads_tf, self._vars('pred_depth')+self._vars('rgb'))
-        self.pred_depth_grads_vars_tf = zip(pred_depth_grads_tf, self._vars('pred_depth'))
+        # self.pred_depth_grads_vars_tf = zip(pred_depth_grads_tf, self._vars('pred_depth'))
         self.Q_grads_vars_tf = zip(Q_grads_tf, self._vars('main/Q'))
         self.pi_grads_vars_tf = zip(pi_grads_tf, self._vars('main/pi'))
         # self.feature_grads_vars_tf = zip(feature_grads_tf, self._vars('rgb')+self._vars('depth'))
         # self.pred_depth_grad_tf = flatten_grads(grads=pred_depth_grads_tf, var_list=self._vars('pred_depth')+self._vars('rgb'))
-        self.pred_depth_grad_tf = flatten_grads(grads=pred_depth_grads_tf, var_list=self._vars('pred_depth'))
+        # self.pred_depth_grad_tf = flatten_grads(grads=pred_depth_grads_tf, var_list=self._vars('pred_depth'))
         self.Q_grad_tf = flatten_grads(grads=Q_grads_tf, var_list=self._vars('main/Q'))
         self.pi_grad_tf = flatten_grads(grads=pi_grads_tf, var_list=self._vars('main/pi'))
         # self.feature_grad_tf = flatten_grads(grads=feature_grads_tf, var_list=self._vars('rgb')+self._vars('depth'))
 
         # optimizers
         # self.pred_depth_adam = MpiAdam(self._vars('pred_depth')+self._vars('rgb'), scale_grad_by_procs=False)
-        self.pred_depth_adam = MpiAdam(self._vars('pred_depth'), scale_grad_by_procs=False)
+        # self.pred_depth_adam = MpiAdam(self._vars('pred_depth'), scale_grad_by_procs=False)
         self.Q_adam = MpiAdam(self._vars('main/Q'), scale_grad_by_procs=False)
         self.pi_adam = MpiAdam(self._vars('main/pi'), scale_grad_by_procs=False)
         # self.feature_adam = MpiAdam(self._vars('rgb')+self._vars('depth'), scale_grad_by_procs=False)
@@ -529,8 +534,8 @@ class DDPG(object):
         logs += [('stats_o/std', np.mean(self.sess.run([self.other_stats.std])))]
         logs += [('stats_g/mean', np.mean(self.sess.run([self.g_stats.mean])))]
         logs += [('stats_g/std', np.mean(self.sess.run([self.g_stats.std])))]
-        logs += [('stats_real_depth_loss/mean', np.mean(self.sess.run([self.rd_stats.mean])))]
-        logs += [('stats_real_depth_loss/std', np.mean(self.sess.run([self.rd_stats.std])))]
+        # logs += [('stats_real_depth_loss/mean', np.mean(self.sess.run([self.rd_stats.mean])))]
+        # logs += [('stats_real_depth_loss/std', np.mean(self.sess.run([self.rd_stats.std])))]
         
         #reintialise
         # self.mean_rd_loss = 0.0
