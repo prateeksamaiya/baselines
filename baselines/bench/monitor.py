@@ -29,6 +29,7 @@ class Monitor(Wrapper):
         self.episode_rewards = []
         self.episode_lengths = []
         self.episode_times = []
+        self.other_args = env.other_args
         self.total_steps = 0
         self.current_reset_info = {} # extra info about the current episode, that was passed in during reset()
 

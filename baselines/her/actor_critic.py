@@ -5,7 +5,8 @@ from baselines.her.util import store_args, nn , features, flat_process_input,fla
 
 class ActorCritic:
     @store_args
-    def __init__(self, inputs_tf, dimo,dim_rgb,dim_depth,dim_other,dimg, dimu, max_u,g_stats,penulti_linear,feature_size,hidden, layers,n_concat_images,**kwargs):
+    def __init__(self, inputs_tf,penulti_linear,feature_size,hidden, layers,other_obs_size,n_concat_images,is_rgb,is_depth,is_other,
+        rgb_stats=None,depth_stats=None,g_stats=None,**kwargs):
         """The actor-critic network and related training code.
 
         Args:
@@ -26,48 +27,58 @@ class ActorCritic:
         self.u_tf = inputs_tf['u']
 
 
-        self.rgb_tf,self.depth_tf,self.other_tf = flat_process_input(self.o_tf,size=self.dim_image,n_concat_images=self.n_concat_images)
+        flat_obs = flat_process_input(self.o_tf,is_rgb,is_depth,is_other,other_obs_size,self.dim_image,self.n_concat_images)
+        
+        pi_inputs=[]
+        Q_inputs=[]
 
         # Prepare inputs for actor and critic.
-        rgb_img = self.rgb_stats.normalize(self.rgb_tf)
-        depth_img = self.depth_stats.normalize(self.depth_tf)
-        self.other = self.other_stats.normalize(self.other_tf)
+        if is_rgb:
+            print(is_rgb)
+            rgb_img = self.rgb_stats.normalize(flat_obs['rgb'])
+            self.rgb_img = tf.reshape(rgb_img,[-1,self.dim_image,self.dim_image,9])
+        if is_depth:
+            depth_img = self.depth_stats.normalize(flat_obs['depth'])
+            self.depth_img = tf.reshape(depth_img,[-1,self.dim_image,self.dim_image,3])
+        if is_other:
+            self.other = self.other_stats.normalize(flat_obs['other'])
+
         g = self.g_stats.normalize(self.g_tf)
-
-        # drone_height = self.other[:,2:2]
-
-      
-        
-        self.rgb_img = tf.reshape(rgb_img,[-1,self.dim_image,self.dim_image,9])
-        self.depth_img = tf.reshape(depth_img,[-1,self.dim_image,self.dim_image,3])
-
 
         with tf.variable_scope('pi'):
 
             # Networks.
-            with tf.variable_scope('rgb'):
-                # print("actor_critic_rgb..............",tf.get_variable_scope().name)
-                self.rgb_vec = features(self.rgb_img,self.penulti_linear,feature_size=self.feature_size)
+            if is_rgb:
+                with tf.variable_scope('rgb'):
+                    self.rgb_vec = features(self.rgb_img,self.penulti_linear,feature_size=self.feature_size)
+                    pi_inputs.append(self.rgb_vec)
+                    Q_inputs.append(tf.stop_gradient(self.rgb_vec))
+
+            if is_depth:
+                with tf.variable_scope('depth'):
+                    self.depth_vec = features(self.depth_img,self.penulti_linear,feature_size=self.feature_size)
+                    pi_inputs.append(self.depth_vec)
+                    Q_inputs.append(tf.stop_gradient(self.depth_vec))
+
+            if is_other:
+                pi_inputs.append(self.other)
+                Q_inputs.append(self.other)
             
-            # with tf.variable_scope('depth'):
-            #     # print("actor_critic_depth..............",tf.get_variable_scope().name)
-            #     self.depth_vec = features(self.depth_img,self.penulti_linear,feature_size=self.feature_size)
-            
-            self.input_pi = tf.concat(axis=1, values=[self.rgb_vec,g])  # for actor
+            self.input_pi = tf.concat(axis=1, values=pi_inputs+[g])  # for actor
 
             self.pi_tf = self.max_u * tf.tanh(nn(self.input_pi, [self.hidden] * self.layers + [self.dimu]))
 
         with tf.variable_scope('Q'):
             # for policy training
             # input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec),tf.stop_gradient(self.depth_vec),self.other, g, self.pi_tf / self.max_u]) #stop gradient used
-            input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec),g, self.pi_tf / self.max_u]) #stop gradient used
+            input_Q = tf.concat(axis=1, values=Q_inputs+[g, self.pi_tf / self.max_u]) #stop gradient used
             # # print("input_q_shape_before",input_Q.get_shape())
             # input_Q = tf.concat(axis=1, values=[o, g, self.pi_tf / self.max_u])
             self.Q_pi_tf = nn(input_Q, [self.hidden] * self.layers + [1])               
             # self.Q_pi_tf = nn(input_Q, [self.hidden] * self.layers + [1])               
             # for critic training
             # input_Q = tf.concat(axis=1, values=[o, g, self.u_tf / self.max_u])
-            input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec),g, self.u_tf / self.max_u]) #stop gradient used
+            input_Q = tf.concat(axis=1, values=Q_inputs+[g, self.u_tf / self.max_u]) #stop gradient used
             # print("input_q_shape_later",input_Q.get_shape())
             self._input_Q = input_Q  # exposed for tests
             self.Q_tf = nn(input_Q, [self.hidden] * self.layers + [1], reuse=True)

@@ -48,30 +48,69 @@ def import_function(spec):
 
     
 
-def flat_process_input(x,size=100,n_concat_images=3):
-    img_len = size*size
-    real_depth = 4*img_len
-    size_all_images = 3*real_depth
-    other = x[:,size_all_images:]
-    x = x[:,:size_all_images]
-    x = tf.reshape(x,[-1,n_concat_images,real_depth])
-    x = tf.transpose(x,[0,2,1])
-    # print("x = ",x.get_shape().as_list())
-    rgb_image = tf.reshape(x[:,:img_len*3,:],[-1,9*img_len])
-    depth_image = tf.reshape(x[:,img_len*3:4*img_len,:],[-1,3*img_len])
-    return rgb_image, depth_image, other
+def flat_process_input(x,is_rgb,is_depth,is_other,other_obs_size,image_width,n_concat_images):
+    # print("x",x.get_shape())
+    flat_obs = {}
+    flat_image = image_width * image_width
+    if is_other:
+        flat_obs['other'] = x[:,-1*other_obs_size:]
+        x = x[:,:-1*other_obs_size]
 
-def flat_process_input_np(x,size=100,n_concat_images=3):
-    img_len = size*size
-    real_depth = 4*img_len
-    size_all_images = 3*real_depth
-    other = x[:,size_all_images:]
-    x = x[:,:size_all_images]
-    x = x.reshape([-1,n_concat_images,real_depth])
+        print(x.get_shape())
+        if x.get_shape()[1].value == 0:
+            return flat_obs
+
+    obs_len = x.get_shape()[1].value//n_concat_images
+
+    x = tf.reshape(x,[-1,n_concat_images,obs_len])
+    x = tf.transpose(x,[0,2,1])
+
+    if is_rgb:
+        flat_obs['rgb'] = tf.reshape(x[:,:flat_image*3,:],[-1,3*n_concat_images*flat_image])
+        x = x[:,flat_image*3:,:]
+
+
+    if is_depth:
+         flat_obs['depth'] = tf.reshape(x,[-1,3*flat_image])
+
+    return flat_obs
+
+def flat_process_input_np(x,is_rgb,is_depth,is_other,other_obs_size,image_width,n_concat_images):
+    flat_obs = {}
+    flat_image = image_width * image_width
+    if is_other:
+        flat_obs['other'] = x[:,-1*other_obs_size:]
+        x = x[:,:-1*other_obs_size]
+
+        if x.shape[1] == 0:
+            return flat_obs
+
+    obs_len = x.shape[1]//n_concat_images
+
+    x = x.reshape([-1,n_concat_images,obs_len])
     x = x.transpose([0,2,1])
-    rgb_image = x[:,:img_len*3,:].reshape([-1,9*img_len])
-    depth_image = x[:,img_len*3:4*img_len,:].reshape([-1,3*img_len])
-    return rgb_image, depth_image, other
+
+    if is_rgb:
+        flat_obs['rgb'] = x[:,:flat_image*3,:].reshape([-1,3*n_concat_images*flat_image])
+        x = x[:,flat_image*3:,:]
+
+
+    if is_depth:
+         flat_obs['depth'] = x.reshape([-1,n_concat_images*flat_image])
+
+    return flat_obs
+
+# def flat_process_input_np(x,size=100,n_concat_images=3):
+#     img_len = size*size
+#     real_depth = 4*img_len
+#     size_all_images = 3*real_depth
+#     other = x[:,size_all_images:]
+#     x = x[:,:size_all_images]
+#     x = x.reshape([-1,n_concat_images,real_depth])
+#     x = x.transpose([0,2,1])
+#     rgb_image = x[:,:img_len*3,:].reshape([-1,9*img_len])
+#     depth_image = x[:,img_len*3:4*img_len,:].reshape([-1,3*img_len])
+#     return rgb_image, depth_image, other
 
 def flatten_grads(var_list, grads):
     """Flattens a variables and their gradients.
