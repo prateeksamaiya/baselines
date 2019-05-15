@@ -29,13 +29,12 @@ class ActorCritic:
 
         flat_obs = flat_process_input(self.o_tf,is_rgb,is_depth,is_other,other_obs_size,self.dim_image,self.n_concat_images)
         
-        
+
         pi_inputs=[]
         Q_inputs=[]
 
         # Prepare inputs for actor and critic.
         if is_rgb:
-            print(is_rgb)
             rgb_img = self.rgb_stats.normalize(flat_obs['rgb'])
             self.rgb_img = tf.reshape(rgb_img,[-1,self.dim_image,self.dim_image,9])
         if is_depth:
