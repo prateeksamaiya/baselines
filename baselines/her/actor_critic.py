@@ -29,6 +29,7 @@ class ActorCritic:
 
         flat_obs = flat_process_input(self.o_tf,is_rgb,is_depth,is_other,other_obs_size,self.dim_image,self.n_concat_images)
         
+        
         pi_inputs=[]
         Q_inputs=[]
 
