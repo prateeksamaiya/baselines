@@ -71,7 +71,7 @@ def flat_process_input(x,is_rgb,is_depth,is_other,other_obs_size,image_width,n_c
 
 
     if is_depth:
-         flat_obs['depth'] = tf.reshape(x,[-1,3*flat_image])
+         flat_obs['depth'] = tf.reshape(x,[-1,n_concat_images*flat_image])
 
     return flat_obs
 
