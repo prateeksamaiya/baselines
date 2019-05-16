@@ -31,7 +31,6 @@ class ActorCritic:
         
 
         pi_inputs=[]
-        Q_inputs=[]
 
         # Prepare inputs for actor and critic.
         if is_rgb:
@@ -50,25 +49,38 @@ class ActorCritic:
             # Networks.
             if is_rgb:
                 with tf.variable_scope('rgb'):
-                    self.rgb_vec = features(self.rgb_img,self.penulti_linear,feature_size=self.feature_size)
-                    pi_inputs.append(self.rgb_vec)
-                    Q_inputs.append(tf.stop_gradient(self.rgb_vec))
+                    self.pi_rgb_vec = features(self.rgb_img,self.penulti_linear,feature_size=self.feature_size)
+                    pi_inputs.append(self.pi_rgb_vec)
 
             if is_depth:
                 with tf.variable_scope('depth'):
-                    self.depth_vec = features(self.depth_img,self.penulti_linear,feature_size=self.feature_size)
-                    pi_inputs.append(self.depth_vec)
-                    Q_inputs.append(tf.stop_gradient(self.depth_vec))
+                    self.pi_depth_vec = features(self.depth_img,self.penulti_linear,feature_size=self.feature_size)
+                    pi_inputs.append(self.pi_depth_vec)
 
             if is_other:
                 pi_inputs.append(self.other)
-                Q_inputs.append(self.other)
             
             self.input_pi = tf.concat(axis=1, values=pi_inputs+[g])  # for actor
 
             self.pi_tf = self.max_u * tf.tanh(nn(self.input_pi, [self.hidden] * self.layers + [self.dimu]))
 
+        Q_inputs=[]
         with tf.variable_scope('Q'):
+
+            # Networks.
+            if is_rgb:
+                with tf.variable_scope('rgb'):
+                    self.Q_rgb_vec = features(self.rgb_img,self.penulti_linear,feature_size=self.feature_size)
+                    Q_inputs.append(self.Q_rgb_vec)
+
+            if is_depth:
+                with tf.variable_scope('depth'):
+                    self.Q_depth_vec = features(self.depth_img,self.penulti_linear,feature_size=self.feature_size)
+                    Q_inputs.append(self.Q_depth_vec)
+
+            if is_other:
+                Q_inputs.append(self.other)
+
             # for policy training
             # input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec),tf.stop_gradient(self.depth_vec),self.other, g, self.pi_tf / self.max_u]) #stop gradient used
             input_Q = tf.concat(axis=1, values=Q_inputs+[g, self.pi_tf / self.max_u]) #stop gradient used
