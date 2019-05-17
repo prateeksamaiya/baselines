@@ -498,10 +498,10 @@ class DDPG(object):
         
         
         # optimizers
-        if self.is_pred_depth:
-            self.pred_depth_adam = MpiAdam(self._vars('pred_depth'), scale_grad_by_procs=False)
         self.Q_adam = MpiAdam(self._vars('main/Q'), scale_grad_by_procs=False)
         self.pi_adam = MpiAdam(self._vars('main/pi'), scale_grad_by_procs=False)
+        if self.is_pred_depth:
+            self.pred_depth_adam = MpiAdam(self._vars('pred_depth'), scale_grad_by_procs=False)
     
 
 

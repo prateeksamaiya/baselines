@@ -127,18 +127,20 @@ def features(input,penulti_linear,feature_size=50):
 
     for i in range(1,5):
         out = tf.layers.conv2d(out,filters=32,kernel_size=[3,3],strides=2,padding='same',activation=tf.nn.relu,name="cov2d_%d" % i)
-    
+    out = tf.layers.conv2d(out,filters=64,kernel_size=[2,2],strides=2,padding='same',activation=tf.nn.relu,name="cov2d_%d" % 5)
+
+
     shape = out.get_shape().as_list()        # a list: [None, 9, 2]
     dim = np.prod(shape[1:])            # dim = prod(9,2) = 18
     x = tf.reshape(out, [-1, dim])           # -1 means "all"
     
     
-    x =  tf.layers.dense(inputs=x,units=penulti_linear,activation=tf.nn.relu,kernel_initializer=tf.contrib.layers.xavier_initializer(),reuse=False)
-    feature =  tf.layers.dense(inputs=x,units=feature_size,kernel_initializer=tf.contrib.layers.xavier_initializer(),reuse=False)
+    # x =  tf.layers.dense(inputs=x,units=penulti_linear,activation=tf.nn.relu,kernel_initializer=tf.contrib.layers.xavier_initializer(),reuse=False)
+    # feature =  tf.layers.dense(inputs=x,units=feature_size,kernel_initializer=tf.contrib.layers.xavier_initializer(),reuse=False)
 
     # print("after_convolution_feature",feature.get_shape())
-
-    return feature
+    print("feature_shape",x.get_shape())
+    return x
 
 
 def nn(input, layers_sizes, reuse=None, flatten=False, name=""):
