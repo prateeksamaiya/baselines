@@ -37,6 +37,7 @@ class RolloutWorker:
         self.info_keys = [key.replace('info_', '') for key in dims.keys() if key.startswith('info_')]
 
         self.first_collision_history = deque(maxlen=history_len)
+        self.reward_history = deque(maxlen=history_len)
         self.success_history = deque(maxlen=history_len)
         self.collision_history = deque(maxlen=history_len)
         self.epi_len_history = deque(maxlen=history_len)
@@ -67,6 +68,7 @@ class RolloutWorker:
         # generate episodes
         obs, achieved_goals, acts, goals, successes, all_collisions = [], [], [], [], [], []
         dones = []
+        rewards = []
         info_values = [np.empty((self.T - 1, self.rollout_batch_size, self.dims['info_' + key]), np.float32) for key in self.info_keys]
         Qs = []
         flag = 1
@@ -95,7 +97,7 @@ class RolloutWorker:
             ag_new = np.empty((self.rollout_batch_size, self.dims['g']))
             success = np.zeros(self.rollout_batch_size)
             # compute new states and observations
-            obs_dict_new, _, done, info = self.venv.step(u)
+            obs_dict_new, reward, done, info = self.venv.step(u)
             o_new = obs_dict_new['observation']
             ag_new = obs_dict_new['achieved_goal']
             success = np.array([i.get('is_success', 0.0) for i in info])
@@ -127,6 +129,7 @@ class RolloutWorker:
             # print("time_per_step",rospy.get_rostime() - start)
 
             dones.append(done)
+            rewards.append(reward)
             obs.append(o.copy())
             achieved_goals.append(ag.copy())
             successes.append(success.copy())
@@ -158,10 +161,12 @@ class RolloutWorker:
         # successful = np.array([np.array(successes).any()])
         assert successful.shape == (self.rollout_batch_size,)
         success_rate = np.mean(successful)
+        reward_rate = np.mean(np.array(rewards).sum())
         collision_rate = np.mean(np.array(all_collisions))
         self.collision_history.append(collision_rate)
         self.first_collision_history.append(first_collision)
         self.success_history.append(success_rate)
+        self.reward_history.append(reward_rate)
         self.epi_len_history.append(t+1)
         if self.compute_Q:
             self.Q_history.append(np.mean(Qs))
@@ -177,6 +182,7 @@ class RolloutWorker:
         self.collision_history.clear()
         self.epi_len_history.clear()
         self.Q_history.clear()
+        self.reward_history.clear()
 
     def current_success_rate(self):
         return np.mean(self.success_history)
@@ -186,6 +192,9 @@ class RolloutWorker:
 
     def current_mean_Q(self):
         return np.mean(self.Q_history)
+
+    def reward_mean(self):
+        return np.mean(self.reward_history)
 
     def save_policy(self, path):
         """Pickles the current policy for later inspection.
@@ -198,9 +207,10 @@ class RolloutWorker:
         """
         logs = []
         logs += [('success_rate', np.mean(self.success_history))]
-        logs += [('first_collision_history', np.mean(self.first_collision_history))]        
+        logs += [('first_collision', np.mean(self.first_collision_history))]        
         logs += [('collision_rate', np.mean(self.collision_history))]
         logs += [('episode_length', np.mean(self.epi_len_history))]
+        logs += [('reward_rate', np.mean(self.reward_history))]
         if self.compute_Q:
             logs += [('mean_Q', np.mean(self.Q_history))]
         logs += [('episode', self.n_episodes)]

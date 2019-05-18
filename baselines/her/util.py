@@ -48,11 +48,11 @@ def import_function(spec):
 
     
 
-def flat_process_input(x,is_rgb,is_depth,is_other,other_obs_size,image_width,n_concat_images):
+def flat_process_input(x,is_rgb,is_depth,is_other,critic_rgb,critic_depth,critic_other,other_obs_size,image_width,n_concat_images):
     # print("x",x.get_shape())
     flat_obs = {}
     flat_image = image_width * image_width
-    if is_other:
+    if is_other or critic_other:
         flat_obs['other'] = x[:,-1*other_obs_size:]
         x = x[:,:-1*other_obs_size]
 
@@ -65,20 +65,20 @@ def flat_process_input(x,is_rgb,is_depth,is_other,other_obs_size,image_width,n_c
     x = tf.reshape(x,[-1,n_concat_images,obs_len])
     x = tf.transpose(x,[0,2,1])
 
-    if is_rgb:
+    if is_rgb or critic_rgb:
         flat_obs['rgb'] = tf.reshape(x[:,:flat_image*3,:],[-1,3*n_concat_images*flat_image])
         x = x[:,flat_image*3:,:]
 
 
-    if is_depth:
+    if is_depth or critic_depth:
          flat_obs['depth'] = tf.reshape(x,[-1,n_concat_images*flat_image])
 
     return flat_obs
 
-def flat_process_input_np(x,is_rgb,is_depth,is_other,other_obs_size,image_width,n_concat_images):
+def flat_process_input_np(x,is_rgb,is_depth,is_other,critic_rgb,critic_depth,critic_other,other_obs_size,image_width,n_concat_images):
     flat_obs = {}
     flat_image = image_width * image_width
-    if is_other:
+    if is_other or critic_other:
         flat_obs['other'] = x[:,-1*other_obs_size:]
         x = x[:,:-1*other_obs_size]
 
@@ -90,12 +90,12 @@ def flat_process_input_np(x,is_rgb,is_depth,is_other,other_obs_size,image_width,
     x = x.reshape([-1,n_concat_images,obs_len])
     x = x.transpose([0,2,1])
 
-    if is_rgb:
+    if is_rgb or critic_rgb:
         flat_obs['rgb'] = x[:,:flat_image*3,:].reshape([-1,3*n_concat_images*flat_image])
         x = x[:,flat_image*3:,:]
 
 
-    if is_depth:
+    if is_depth or critic_depth:
          flat_obs['depth'] = x.reshape([-1,n_concat_images*flat_image])
 
     return flat_obs

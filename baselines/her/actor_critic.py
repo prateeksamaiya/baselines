@@ -6,7 +6,7 @@ from baselines.her.util import store_args, nn , features, flat_process_input,fla
 class ActorCritic:
     @store_args
     def __init__(self, inputs_tf,penulti_linear,feature_size,hidden, layers,other_obs_size,n_concat_images,is_rgb,is_depth,is_other,
-        rgb_stats=None,depth_stats=None,g_stats=None,**kwargs):
+        critic_rgb,critic_depth,critic_other,rgb_stats=None,depth_stats=None,g_stats=None,**kwargs):
         """The actor-critic network and related training code.
 
         Args:
@@ -27,19 +27,19 @@ class ActorCritic:
         self.u_tf = inputs_tf['u']
 
 
-        flat_obs = flat_process_input(self.o_tf,is_rgb,is_depth,is_other,other_obs_size,self.dim_image,self.n_concat_images)
+        flat_obs = flat_process_input(self.o_tf,is_rgb,is_depth,is_other,critic_rgb,critic_depth,critic_other,other_obs_size,self.dim_image,self.n_concat_images)
         
 
         pi_inputs=[]
 
         # Prepare inputs for actor and critic.
-        if is_rgb:
+        if is_rgb or critic_rgb:
             rgb_img = self.rgb_stats.normalize(flat_obs['rgb'])
             self.rgb_img = tf.reshape(rgb_img,[-1,self.dim_image,self.dim_image,3*n_concat_images])
-        if is_depth:
+        if is_depth or critic_depth:
             depth_img = self.depth_stats.normalize(flat_obs['depth'])
             self.depth_img = tf.reshape(depth_img,[-1,self.dim_image,self.dim_image,n_concat_images])
-        if is_other:
+        if is_other or critic_other:
             self.other = self.other_stats.normalize(flat_obs['other'])
 
         g = self.g_stats.normalize(self.g_tf)
@@ -68,17 +68,17 @@ class ActorCritic:
         with tf.variable_scope('Q'):
 
             # Networks.
-            if is_rgb:
+            if critic_rgb:
                 with tf.variable_scope('rgb'):
                     self.Q_rgb_vec = features(self.rgb_img,self.penulti_linear,feature_size=self.feature_size)
                     Q_inputs.append(self.Q_rgb_vec)
 
-            if is_depth:
+            if critic_depth:
                 with tf.variable_scope('depth'):
                     self.Q_depth_vec = features(self.depth_img,self.penulti_linear,feature_size=self.feature_size)
                     Q_inputs.append(self.Q_depth_vec)
 
-            if is_other:
+            if critic_other:
                 Q_inputs.append(self.other)
 
             # for policy training

@@ -26,7 +26,8 @@ class DDPG(object):
                  Q_lr, pi_lr, norm_eps, norm_clip, max_u, action_l2, clip_obs, scope, T,
                  rollout_batch_size, subtract_goals, relative_goals, clip_pos_returns, clip_return,
                  bc_loss, q_filter, num_demo, demo_batch_size, prm_loss_weight, aux_loss_weight,
-                 sample_transitions, gamma,penulti_linear,feature_size,other_obs_size,n_concat_images,image_size,is_rgb,is_depth,is_other,is_pred_depth,reuse=False,**kwargs):
+                 sample_transitions, gamma,penulti_linear,feature_size,other_obs_size,n_concat_images,image_size,is_rgb,is_depth,is_other,is_pred_depth,critic_depth,
+                 critic_rgb,critic_other,reuse=False,**kwargs):
         """Implementation of DDPG that is used in combination with Hindsight Experience Replay (HER).
             Added functionality to use demonstrations for training to Overcome exploration problem.
 
@@ -224,14 +225,14 @@ class DDPG(object):
                 o, g, ag = transitions['o'], transitions['g'], transitions['ag']
                 transitions['o'], transitions['g'] = self._preprocess_og(o, ag, g)
                 # No need to preprocess the o_2 and g_2 since this is only used for stats
-                flat_obs = flat_process_input_np(transitions['o'],self.is_rgb,self.is_depth,self.is_other,self.other_obs_size,self.dim_image,self.n_concat_images)
-                if self.is_rgb:
+                flat_obs = flat_process_input_np(transitions['o'],self.is_rgb,self.is_depth,self.is_other,self.critic_rgb,self.critic_depth,self.critic_other,self.other_obs_size,self.dim_image,self.n_concat_images)
+                if self.is_rgb or self.critic_rgb:
                     self.rgb_stats.update(flat_obs['rgb'])
                     self.rgb_stats.recompute_stats()
-                if self.is_depth:
+                if self.is_depth or self.critic_depth:
                     self.depth_stats.update(flat_obs['depth'])
                     self.depth_stats.recompute_stats()
-                if self.is_other:
+                if self.is_other or self.critic_other:
                     self.other_stats.update(flat_obs['other'])
                     self.other_stats.recompute_stats()
                 self.g_stats.update(transitions['g'])
@@ -261,14 +262,14 @@ class DDPG(object):
             transitions['o'], transitions['g'] = self._preprocess_og(o, ag, g)
             # No need to preprocess the o_2 and g_2 since this is only used for stats
 
-            flat_obs = flat_process_input_np(transitions['o'],self.is_rgb,self.is_depth,self.is_other,self.other_obs_size,self.dim_image,self.n_concat_images)
-            if self.is_rgb:
+            flat_obs = flat_process_input_np(transitions['o'],self.is_rgb,self.is_depth,self.is_other,self.critic_rgb,self.critic_depth,self.critic_other,self.other_obs_size,self.dim_image,self.n_concat_images)
+            if self.is_rgb or self.critic_rgb:
                 self.rgb_stats.update(flat_obs['rgb'])
                 self.rgb_stats.recompute_stats()
-            if self.is_depth:
+            if self.is_depth or self.critic_depth:
                 self.depth_stats.update(flat_obs['depth'])
                 self.depth_stats.recompute_stats()
-            if self.is_other:
+            if self.is_other or self.critic_other:
                 self.other_stats.update(flat_obs['other'])
                 self.other_stats.recompute_stats()
             self.g_stats.update(transitions['g'])
@@ -378,17 +379,17 @@ class DDPG(object):
         self.sess = tf_util.get_session()
 
         # running averages
-        if self.is_rgb:
+        if self.is_rgb or self.critic_rgb:
             with tf.variable_scope('rgb_stats') as vs:
                 if reuse:
                     vs.reuse_variables()
                 self.rgb_stats = Normalizer(self.dim_rgb, self.norm_eps, self.norm_clip, sess=self.sess)
-        if self.is_depth:
+        if self.is_depth or self.critic_depth:
             with tf.variable_scope('depth_stats') as vs:
                 if reuse:
                     vs.reuse_variables()
                 self.depth_stats = Normalizer(self.dim_depth, self.norm_eps, self.norm_clip, sess=self.sess)
-        if self.is_other:
+        if self.is_other or self.critic_other:
             with tf.variable_scope('other_stats') as vs:
                 if reuse:
                     vs.reuse_variables()
@@ -519,13 +520,13 @@ class DDPG(object):
 
     def logs(self, prefix=''):
         logs = []
-        if self.is_rgb:
+        if self.is_rgb or self.critic_rgb:
             logs += [('stats_rgb/mean', np.mean(self.sess.run([self.rgb_stats.mean])))]
             logs += [('stats_rgb/std', np.mean(self.sess.run([self.rgb_stats.std])))]
-        if self.is_depth:
+        if self.is_depth or self.critic_depth:
             logs += [('stats_depth/mean', np.mean(self.sess.run([self.depth_stats.mean])))]
             logs += [('stats_depth/std', np.mean(self.sess.run([self.depth_stats.std])))]
-        if self.is_other:
+        if self.is_other or self.critic_other:
             logs += [('stats_o/mean', np.mean(self.sess.run([self.other_stats.mean])))]
             logs += [('stats_o/std', np.mean(self.sess.run([self.other_stats.std])))]
         if self.is_pred_depth:
