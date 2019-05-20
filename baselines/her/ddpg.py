@@ -92,6 +92,7 @@ class DDPG(object):
 
         # Prepare staging area for feeding data to the model.
         stage_shapes = OrderedDict()
+
         for key in sorted(self.input_dims.keys()):
             if key.startswith('info_'):
                 continue
@@ -101,6 +102,7 @@ class DDPG(object):
         stage_shapes['r'] = (None,)
         self.stage_shapes = stage_shapes
 
+        print("stage_shapes",stage_shapes)
         # Create network.
         with tf.device('/device:GPU:0'):
             with tf.variable_scope(self.scope):
