@@ -65,7 +65,7 @@ class DDPG(object):
             aux_loss_weight: Weight corresponding to the auxilliary loss also called the cloning loss
 
         """
-        logger.log(kwargs)
+        logger.log(self.__dict__)
         self.train_steps = 0
 
         self.mean_rd_loss = 0.0

@@ -85,7 +85,7 @@ def make_sample_her_transitions(replay_strategy, replay_k, reward_fun):
 
             # if transitions['info_is_success'][i][0] and transitions['r'][i] != 0:
             if transitions['info_is_success'][i][0]:
-                transitions['r'][i] = 0
+                transitions['r'][i] = 1
 
             if transitions['info_collision'][i][0]:
                 transitions['r'][i] = transitions['r'][i] - 100
