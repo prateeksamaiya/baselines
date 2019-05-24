@@ -38,7 +38,7 @@ class RolloutWorker:
 
         self.first_collision_history = deque(maxlen=history_len)
         self.reward_history = deque(maxlen=history_len)
-        self.success_history = deque(maxlen=history_len)
+        self.max_distance_history = deque(maxlen=history_len)
         self.collision_history = deque(maxlen=history_len)
         self.epi_len_history = deque(maxlen=history_len)
         self.Q_history = deque(maxlen=history_len)
@@ -50,8 +50,6 @@ class RolloutWorker:
     def reset_all_rollouts(self):
         self.obs_dict = self.venv.reset()
         self.initial_o = self.obs_dict['observation']
-        self.initial_ag = self.obs_dict['achieved_goal']
-        self.g = self.obs_dict['desired_goal']
 
     def generate_rollouts(self):
         """Performs `rollout_batch_size` rollouts in parallel for time horizon `T` with the current
@@ -61,23 +59,18 @@ class RolloutWorker:
 
         # compute observations
         o = np.empty((self.rollout_batch_size, self.dims['o']), np.float32)  # observations
-        ag = np.empty((self.rollout_batch_size, self.dims['g']), np.float32)  # achieved goals
-        o[:] = self.initial_o
-        ag[:] = self.initial_ag
 
         # generate episodes
-        obs, achieved_goals, acts, goals, successes, all_collisions = [], [], [], [], [], []
+        obs,rewards,acts, all_collisions = [], [], [], []
         dones = []
-        rewards = []
+        max_distance = 0
         info_values = [np.empty((self.T - 1, self.rollout_batch_size, self.dims['info_' + key]), np.float32) for key in self.info_keys]
         Qs = []
         flag = 1
         first_collision = 0
         for t in range(self.T):
-            # print(t)
-            # start = rospy.get_rostime()
             policy_output = self.policy.get_actions(
-                o, ag, self.g,
+                o,
                 compute_Q=self.compute_Q,
                 noise_eps=self.noise_eps if not self.exploit else 0.,
                 random_eps=self.random_eps if not self.exploit else 0.,
@@ -94,14 +87,13 @@ class RolloutWorker:
                 u = u.reshape(1, -1)
 
             o_new = np.empty((self.rollout_batch_size, self.dims['o']))
-            ag_new = np.empty((self.rollout_batch_size, self.dims['g']))
-            success = np.zeros(self.rollout_batch_size)
             # compute new states and observations
             obs_dict_new, reward, done, info = self.venv.step(u)
             o_new = obs_dict_new['observation']
-            ag_new = obs_dict_new['achieved_goal']
-            success = np.array([i.get('is_success', 0.0) for i in info])
             collision = np.array([i.get('collision', 0.0) for i in info])
+            distance_from_origin =  np.array([i.get('distance', 0.0) for i in info])
+
+            max_distance = max(max_distance,distance_from_origin)
 
             
             if collision[0] == True and flag:
@@ -131,41 +123,26 @@ class RolloutWorker:
             dones.append(done)
             rewards.append(reward)
             obs.append(o.copy())
-            achieved_goals.append(ag.copy())
-            successes.append(success.copy())
             all_collisions.append(collision.copy())
             acts.append(u.copy())
-            goals.append(self.g.copy())
             o[...] = o_new
-            ag[...] = ag_new
 
 
         obs.append(o.copy())
-        achieved_goals.append(ag.copy())
 
         episode = dict(o=obs,
                        u=acts,
-                       g=goals,
-                       ag=achieved_goals)
+                       r=rewards,
+                       )
 
         for key, value in zip(self.info_keys, info_values):
             episode['info_{}'.format(key)] = value[:t]
 
-        # stats
-        # print(t)
-        # print(len(successes))
-        # print(self.rollout_batch_size)
-        # print(successes)
-
-        successful = np.array(successes)[-1, :]
-        # successful = np.array([np.array(successes).any()])
-        assert successful.shape == (self.rollout_batch_size,)
-        success_rate = np.mean(successful)
         reward_rate = np.mean(np.array(rewards).sum())
         collision_rate = np.mean(np.array(all_collisions))
         self.collision_history.append(collision_rate)
         self.first_collision_history.append(first_collision)
-        self.success_history.append(success_rate)
+        self.max_distance_history.append(max_distance)
         self.reward_history.append(reward_rate)
         self.epi_len_history.append(t+1)
         if self.compute_Q:
@@ -177,15 +154,12 @@ class RolloutWorker:
     def clear_history(self):
         """Clears all histories that are used for statistics
         """
-        self.success_history.clear()
         self.first_collision_history.clear()
         self.collision_history.clear()
         self.epi_len_history.clear()
         self.Q_history.clear()
         self.reward_history.clear()
-
-    def current_success_rate(self):
-        return np.mean(self.success_history)
+        self.max_distance_history.clear()
     
     def current_collision_rate(self):
         return np.mean(self.collision_history)
@@ -206,11 +180,12 @@ class RolloutWorker:
         """Generates a dictionary that contains all collected statistics.
         """
         logs = []
-        logs += [('success_rate', np.mean(self.success_history))]
         logs += [('first_collision', np.mean(self.first_collision_history))]        
         logs += [('collision_rate', np.mean(self.collision_history))]
         logs += [('episode_length', np.mean(self.epi_len_history))]
         logs += [('reward_rate', np.mean(self.reward_history))]
+        logs += [('max_distance', np.mean(self.max_distance_history))]
+
         if self.compute_Q:
             logs += [('mean_Q', np.mean(self.Q_history))]
         logs += [('episode', self.n_episodes)]

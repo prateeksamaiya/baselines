@@ -86,7 +86,6 @@ class DDPG(object):
         self.dim_rgb = n_concat_images*3*flat_image_size # 3 channels and n images concatenated
         self.dim_depth = n_concat_images*flat_image_size
         self.dim_other = self.other_obs_size
-        self.dimg = self.input_dims['g']
         self.dimu = self.input_dims['u']
         self.dim_rd = 1
 
@@ -97,7 +96,7 @@ class DDPG(object):
             if key.startswith('info_'):
                 continue
             stage_shapes[key] = (None, *input_shapes[key])
-        for key in ['o', 'g']:
+        for key in ['o',]:
             stage_shapes[key + '_2'] = stage_shapes[key]
         stage_shapes['r'] = (None,)
         self.stage_shapes = stage_shapes
@@ -112,11 +111,11 @@ class DDPG(object):
 
                 self._create_network(reuse=reuse)
 
+
+        print("input_shapes",input_shapes)
         # Configure the replay buffer.
         buffer_shapes = {key: (self.T-1 if key != 'o' else self.T, *input_shapes[key])
                          for key, val in input_shapes.items()}
-        buffer_shapes['g'] = (buffer_shapes['g'][0], self.dimg)
-        buffer_shapes['ag'] = (self.T, self.dimg)
 
         buffer_size = (self.buffer_size // self.rollout_batch_size) * self.rollout_batch_size
         self.buffer = ReplayBuffer(buffer_shapes, buffer_size, self.T, self.sample_transitions)
@@ -127,24 +126,17 @@ class DDPG(object):
     def _random_action(self, n):
         return np.random.uniform(low=-self.max_u, high=self.max_u, size=(n, self.dimu))
 
-    def _preprocess_og(self, o, ag, g):
-        if self.relative_goals:
-            g_shape = g.shape
-            g = g.reshape(-1, self.dimg)
-            ag = ag.reshape(-1, self.dimg)
-            g = self.subtract_goals(g, ag)
-            g = g.reshape(*g_shape)
+    def _preprocess_og(self, o):
         o = np.clip(o, -self.clip_obs, self.clip_obs)
-        g = np.clip(g, -self.clip_obs, self.clip_obs)
-        return o, g
+        return o
 
     def step(self, obs,test=False):
-        actions = self.get_actions(obs['observation'], obs['achieved_goal'], obs['desired_goal'],test=test)
+        actions = self.get_actions(obs['observation'],test=test)
         return actions, None, None, None
 
 
-    def get_actions(self, o, ag, g, noise_eps=0., random_eps=0., use_target_net=False,compute_Q=False,test=False):
-        o, g = self._preprocess_og(o, ag, g)
+    def get_actions(self, o, noise_eps=0., random_eps=0., use_target_net=False,compute_Q=False,test=False):
+        o = self._preprocess_og(o)
 
         if test:
             print("called")
@@ -159,7 +151,6 @@ class DDPG(object):
         # feed
         feed = {
             policy.o_tf: o.reshape(-1, self.dimo),
-            policy.g_tf: g.reshape(-1, self.dimg),
             policy.u_tf: np.zeros((o.size // self.dimo, self.dimu), dtype=np.float32)
         }
 
@@ -190,25 +181,23 @@ class DDPG(object):
         demo_data_acs = demoData['acs']
         demo_data_info = demoData['info']
 
+
         for epsd in range(self.num_demo): # we initialize the whole demo buffer at the start of the training
-            obs, acts, goals, achieved_goals = [], [] ,[] ,[]
+            obs, acts,rewards = [], [] ,[]
             i = 0
             for transition in range(self.T - 1):
                 obs.append([demo_data_obs[epsd][transition].get('observation')])
                 acts.append([demo_data_acs[epsd][transition]])
-                goals.append([demo_data_obs[epsd][transition].get('desired_goal')])
-                achieved_goals.append([demo_data_obs[epsd][transition].get('achieved_goal')])
                 for idx, key in enumerate(info_keys):
                     info_values[idx][transition, i] = demo_data_info[epsd][transition][key]
 
 
             obs.append([demo_data_obs[epsd][self.T - 1].get('observation')])
-            achieved_goals.append([demo_data_obs[epsd][self.T - 1].get('achieved_goal')])
 
             episode = dict(o=obs,
                            u=acts,
-                           g=goals,
-                           ag=achieved_goals)
+                           r=rewards,
+                           )
             for key, value in zip(info_keys, info_values):
                 episode['info_{}'.format(key)] = value
 
@@ -220,12 +209,11 @@ class DDPG(object):
             if update_stats:
                 # add transitions to normalizer to normalize the demo data as well
                 episode['o_2'] = episode['o'][:, 1:, :]
-                episode['ag_2'] = episode['ag'][:, 1:, :]
                 num_normalizing_transitions = transitions_in_episode_batch(episode)
                 transitions = self.sample_transitions(episode, num_normalizing_transitions)
 
-                o, g, ag = transitions['o'], transitions['g'], transitions['ag']
-                transitions['o'], transitions['g'] = self._preprocess_og(o, ag, g)
+                o = transitions['o']
+                transitions['o'] = self._preprocess_og(o)
                 # No need to preprocess the o_2 and g_2 since this is only used for stats
                 flat_obs = flat_process_input_np(transitions['o'],self.is_rgb,self.is_depth,self.is_other,self.critic_rgb,self.critic_depth,self.critic_other,self.other_obs_size,self.dim_image,self.n_concat_images)
                 if self.is_rgb or self.critic_rgb:
@@ -237,8 +225,6 @@ class DDPG(object):
                 if self.is_other or self.critic_other:
                     self.other_stats.update(flat_obs['other'])
                     self.other_stats.recompute_stats()
-                self.g_stats.update(transitions['g'])
-                self.g_stats.recompute_stats()
 
             episode.clear()
 
@@ -255,13 +241,12 @@ class DDPG(object):
         if update_stats:
             # add transitions to normalizer
             episode_batch['o_2'] = episode_batch['o'][:, 1:, :]
-            episode_batch['ag_2'] = episode_batch['ag'][:, 1:, :]
             num_normalizing_transitions = transitions_in_episode_batch(episode_batch)
             # print("num_normalizing_transitions",num_normalizing_transitions)
             transitions = self.sample_transitions(episode_batch,num_normalizing_transitions)
 
-            o, g, ag = transitions['o'], transitions['g'], transitions['ag']
-            transitions['o'], transitions['g'] = self._preprocess_og(o, ag, g)
+            o = transitions['o']
+            transitions['o']= self._preprocess_og(o)
             # No need to preprocess the o_2 and g_2 since this is only used for stats
 
             flat_obs = flat_process_input_np(transitions['o'],self.is_rgb,self.is_depth,self.is_other,self.critic_rgb,self.critic_depth,self.critic_other,self.other_obs_size,self.dim_image,self.n_concat_images)
@@ -274,8 +259,6 @@ class DDPG(object):
             if self.is_other or self.critic_other:
                 self.other_stats.update(flat_obs['other'])
                 self.other_stats.recompute_stats()
-            self.g_stats.update(transitions['g'])
-            self.g_stats.recompute_stats()
 
 
     def get_current_buffer_size(self):
@@ -328,10 +311,9 @@ class DDPG(object):
         else:
             transitions = self.buffer.sample(self.batch_size) #otherwise only sample from primary buffer
 
-        o, o_2, g = transitions['o'], transitions['o_2'], transitions['g']
-        ag, ag_2 = transitions['ag'], transitions['ag_2']
-        transitions['o'], transitions['g'] = self._preprocess_og(o, ag, g)
-        transitions['o_2'], transitions['g_2'] = self._preprocess_og(o_2, ag_2, g)
+        o, o_2= transitions['o'], transitions['o_2']
+        transitions['o'] = self._preprocess_og(o)
+        transitions['o_2'] = self._preprocess_og(o_2)
 
         transitions_batch = [transitions[key] for key in self.stage_shapes.keys()]
         return transitions_batch
@@ -401,10 +383,6 @@ class DDPG(object):
                 if reuse:
                     vs.reuse_variables()
                 self.rd_stats = Normalizer(self.dim_rd, self.norm_eps, self.norm_clip, sess=self.sess)
-        with tf.variable_scope('g_stats') as vs:
-            if reuse:
-                vs.reuse_variables()
-            self.g_stats = Normalizer(self.dimg, self.norm_eps, self.norm_clip, sess=self.sess)
     
 
         # mini-batch sampling.
@@ -427,7 +405,6 @@ class DDPG(object):
                 vs.reuse_variables()
             target_batch_tf = batch_tf.copy()
             target_batch_tf['o'] = batch_tf['o_2']
-            target_batch_tf['g'] = batch_tf['g_2']
             self.target = self.create_actor_critic(target_batch_tf, net_type='target', **self.__dict__)
             vs.reuse_variables()
         assert len(self._vars("main")) == len(self._vars("target"))
@@ -534,8 +511,6 @@ class DDPG(object):
         if self.is_pred_depth:
             logs += [('stats_rd_stats/mean', np.mean(self.sess.run([self.rd_stats.mean])))]
             logs += [('stats_rd_stats/std', np.mean(self.sess.run([self.rd_stats.std])))]
-        logs += [('stats_g/mean', np.mean(self.sess.run([self.g_stats.mean])))]
-        logs += [('stats_g/std', np.mean(self.sess.run([self.g_stats.std])))]
         
         if prefix != '' and not prefix.endswith('/'):
             return [(prefix + '/' + key, val) for key, val in logs]

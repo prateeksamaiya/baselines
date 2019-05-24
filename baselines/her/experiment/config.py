@@ -128,19 +128,11 @@ def configure_her(params):
     env = cached_make_env(params['make_env'])
     env.reset()
 
-    def reward_fun(ag_2, g, info):  # vectorized
-        return env.compute_reward(achieved_goal=ag_2, desired_goal=g, info=info)
+    # def reward_fun(ag_2, g, info):  # vectorized
+    #     return env.compute_reward(achieved_goal=ag_2, desired_goal=g, info=info)
 
     # Prepare configuration for HER.
-    her_params = {
-        'reward_fun': reward_fun,
-    }
-    for name in ['replay_strategy', 'replay_k']:
-        her_params[name] = params[name]
-        params['_' + name] = her_params[name]
-        del params[name]
-    sample_her_transitions = make_sample_her_transitions(**her_params)
-
+    sample_her_transitions = make_sample_her_transitions()
     return sample_her_transitions
 
 
@@ -188,12 +180,12 @@ def configure_ddpg(dims, params, reuse=False, use_mpi=True, clip_return=True):
 def configure_dims(params):
     env = cached_make_env(params['make_env'])
     env.reset()
-    obs, _, _, info = env.step(env.action_space.sample())
+    obs, reward, _, info = env.step(env.action_space.sample())
 
     dims = {
         'o': obs['observation'].shape[0],
         'u': env.action_space.shape[0],
-        'g': obs['desired_goal'].shape[0],
+        'r':0
     }
     for key, value in info.items():
         value = np.array(value)

@@ -64,6 +64,7 @@ def train(*, policy, rollout_worker, evaluator,
         # train
         rollout_worker.clear_history()
         for count in range(n_cycles):
+            # print(rank,count)
             # print(count)
             rollout_start_time = time.time()
             episode = rollout_worker.generate_rollouts()

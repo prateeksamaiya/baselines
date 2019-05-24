@@ -23,7 +23,6 @@ class ActorCritic:
             layers (int): number of hidden layers
         """
         self.o_tf = inputs_tf['o']
-        self.g_tf = inputs_tf['g']
         self.u_tf = inputs_tf['u']
 
 
@@ -42,7 +41,6 @@ class ActorCritic:
         if is_other or critic_other:
             self.other = self.other_stats.normalize(flat_obs['other'])
 
-        g = self.g_stats.normalize(self.g_tf)
 
         with tf.variable_scope('pi'):
 
@@ -60,7 +58,7 @@ class ActorCritic:
             if is_other:
                 pi_inputs.append(self.other)
             
-            self.input_pi = tf.concat(axis=1, values=pi_inputs+[g])  # for actor
+            self.input_pi = tf.concat(axis=1, values=pi_inputs)  # for actor
 
             self.pi_tf = self.max_u * tf.tanh(nn(self.input_pi, [self.hidden] * self.layers + [self.dimu]))
 
@@ -83,14 +81,14 @@ class ActorCritic:
 
             # for policy training
             # input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec),tf.stop_gradient(self.depth_vec),self.other, g, self.pi_tf / self.max_u]) #stop gradient used
-            input_Q = tf.concat(axis=1, values=Q_inputs+[g, self.pi_tf / self.max_u]) #stop gradient used
+            input_Q = tf.concat(axis=1, values=Q_inputs+[self.pi_tf / self.max_u]) #stop gradient used
             # # print("input_q_shape_before",input_Q.get_shape())
             # input_Q = tf.concat(axis=1, values=[o, g, self.pi_tf / self.max_u])
             self.Q_pi_tf = nn(input_Q, [self.hidden] * self.layers + [1])               
             # self.Q_pi_tf = nn(input_Q, [self.hidden] * self.layers + [1])               
             # for critic training
             # input_Q = tf.concat(axis=1, values=[o, g, self.u_tf / self.max_u])
-            input_Q = tf.concat(axis=1, values=Q_inputs+[g, self.u_tf / self.max_u]) #stop gradient used
+            input_Q = tf.concat(axis=1, values=Q_inputs+[self.u_tf / self.max_u]) #stop gradient used
             # print("input_q_shape_later",input_Q.get_shape())
             self._input_Q = input_Q  # exposed for tests
             self.Q_tf = nn(input_Q, [self.hidden] * self.layers + [1], reuse=True)
