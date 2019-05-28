@@ -17,11 +17,11 @@ def make_sample_her_transitions():
 
         for key in episode_batch.keys():
             transitions[key] = np.array([episode_batch[key][episode][sample] for episode,sample in zip(episode_idxs,t_samples)])
-            
+          
 
         transitions = {k: transitions[k].reshape(batch_size, *transitions[k].shape[1:])
                        for k in transitions.keys()}
-
+                       
 
         assert(transitions['u'].shape[0] == batch_size_in_transitions)
 

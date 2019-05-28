@@ -81,7 +81,8 @@ def prepare_params(kwargs):
             try:
                 from mpi4py import MPI
                 mpi_rank = MPI.COMM_WORLD.Get_rank()
-            except ImportError:
+            except ImportError as e:
+                print(e)
                 MPI = None
                 mpi_rank = 0
                 logger.warn('Running with a single MPI process. This should work, but the results may differ from the ones publshed in Plappert et al.')

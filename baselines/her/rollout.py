@@ -59,6 +59,7 @@ class RolloutWorker:
 
         # compute observations
         o = np.empty((self.rollout_batch_size, self.dims['o']), np.float32)  # observations
+        o[:] = self.initial_o
 
         # generate episodes
         obs,rewards,acts, all_collisions = [], [], [], []

@@ -13,12 +13,16 @@ import baselines.her.experiment.config as config
 from baselines.her.rollout import RolloutWorker
 import tensorflow as tf
 
-def mpi_average(value):
+def mpi_average(value,dtype=np.float32):
     if not isinstance(value, list):
         value = [value]
     if not any(value):
         value = [0.]
-    return mpi_moments(np.array(value))[0]
+
+    if hasattr(value[0],"dtype"):
+        # print(value[0].dtype)
+        dtype = value[0].dtype
+    return mpi_moments(np.array(value,dtype=dtype))[0]
 
 
 def train(*, policy, rollout_worker, evaluator,
@@ -239,7 +243,7 @@ def learn(*, network, env, total_timesteps,
     n_cycles = params['n_cycles']
     n_epochs = total_timesteps // n_cycles // rollout_worker.T // rollout_worker.rollout_batch_size
 
-    with tf.device('/device:GPU:0'):
+    with tf.device('/device:GPU:0'):   
         return train(
             save_path=save_path, policy=policy, rollout_worker=rollout_worker,
             evaluator=evaluator, n_epochs=n_epochs, n_test_rollouts=params['n_test_rollouts'],

@@ -242,7 +242,6 @@ class DDPG(object):
             # add transitions to normalizer
             episode_batch['o_2'] = episode_batch['o'][:, 1:, :]
             num_normalizing_transitions = transitions_in_episode_batch(episode_batch)
-            # print("num_normalizing_transitions",num_normalizing_transitions)
             transitions = self.sample_transitions(episode_batch,num_normalizing_transitions)
 
             o = transitions['o']
@@ -483,12 +482,27 @@ class DDPG(object):
         if self.is_pred_depth:
             self.pred_depth_adam = MpiAdam(self._vars('pred_depth'), scale_grad_by_procs=False)
     
+        stat_vars = None
 
+        if self.is_rgb or self.critic_rgb:
+            stat_vars = self._global_vars('rgb_stats') 
+
+        if self.is_depth or self.critic_depth:
+            if stat_vars:
+                stat_vars +=  self._global_vars('depth_stats')
+            else:
+                stat_vars =  self._global_vars('depth_stats')
+
+        if self.is_other or self.critic_other:
+            if stat_vars:
+                stat_vars +=  self._global_vars('other_stats')
+            else:
+                stat_vars =  self._global_vars('other_stats')
 
         # polyak averaging
         self.main_vars = self._vars('main/Q') + self._vars('main/pi')
         self.target_vars = self._vars('target/Q') + self._vars('target/pi')
-        self.stats_vars = self._global_vars('rgb_stats') + self._global_vars('depth_stats')+ self._global_vars('other_stats')+ self._global_vars('g_stats')
+        self.stats_vars =  stat_vars
         self.init_target_net_op = list(map(lambda v: v[0].assign(v[1]), zip(self.target_vars, self.main_vars)))
         self.update_target_net_op = list(map(lambda v: v[0].assign(self.polyak * v[0] + (1. - self.polyak) * v[1]), zip(self.target_vars, self.main_vars)))
 
@@ -506,8 +520,8 @@ class DDPG(object):
             logs += [('stats_depth/mean', np.mean(self.sess.run([self.depth_stats.mean])))]
             logs += [('stats_depth/std', np.mean(self.sess.run([self.depth_stats.std])))]
         if self.is_other or self.critic_other:
-            logs += [('stats_o/mean', np.mean(self.sess.run([self.other_stats.mean])))]
-            logs += [('stats_o/std', np.mean(self.sess.run([self.other_stats.std])))]
+            logs += [('stats_other/mean', np.mean(self.sess.run([self.other_stats.mean])))]
+            logs += [('stats_other/std', np.mean(self.sess.run([self.other_stats.std])))]
         if self.is_pred_depth:
             logs += [('stats_rd_stats/mean', np.mean(self.sess.run([self.rd_stats.mean])))]
             logs += [('stats_rd_stats/std', np.mean(self.sess.run([self.rd_stats.std])))]
