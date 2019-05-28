@@ -211,7 +211,8 @@ def learn(*, network, env, total_timesteps,
         logger.warn()
 
     dims = config.configure_dims(params)
-    policy = config.configure_ddpg(dims=dims, params=params, clip_return=clip_return)
+    policy_dims = config.configure_dims(params)
+    policy = config.configure_ddpg(dims=policy_dims, params=params, clip_return=clip_return)
     if load_path is not None:
         tf_util.load_variables(load_path)
 

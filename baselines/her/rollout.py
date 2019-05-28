@@ -50,6 +50,7 @@ class RolloutWorker:
     def reset_all_rollouts(self):
         self.obs_dict = self.venv.reset()
         self.initial_o = self.obs_dict['observation']
+        self.initial_c = self.obs_dict['current']
 
     def generate_rollouts(self):
         """Performs `rollout_batch_size` rollouts in parallel for time horizon `T` with the current
@@ -59,7 +60,9 @@ class RolloutWorker:
 
         # compute observations
         o = np.empty((self.rollout_batch_size, self.dims['o']), np.float32)  # observations
+        
         o[:] = self.initial_o
+        c = self.initial_c
 
         # generate episodes
         obs,rewards,acts, all_collisions = [], [], [], []
@@ -91,6 +94,7 @@ class RolloutWorker:
             # compute new states and observations
             obs_dict_new, reward, done, info = self.venv.step(u)
             o_new = obs_dict_new['observation']
+            c_new = obs_dict_new['current']
             collision = np.array([i.get('collision', 0.0) for i in info])
             distance_from_origin =  np.array([i.get('distance', 0.0) for i in info])
 
@@ -123,13 +127,14 @@ class RolloutWorker:
 
             dones.append(done)
             rewards.append(reward)
-            obs.append(o.copy())
+            obs.append(c.copy())
             all_collisions.append(collision.copy())
             acts.append(u.copy())
             o[...] = o_new
+            c[...] = c_new
 
 
-        obs.append(o.copy())
+        obs.append(c.copy())
 
         episode = dict(o=obs,
                        u=acts,

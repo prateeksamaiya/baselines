@@ -194,3 +194,28 @@ def configure_dims(params):
             value = value.reshape(1)
         dims['info_{}'.format(key)] = value.shape[0]
     return dims
+
+def policy_configure_dims(params):
+    env = cached_make_env(params['make_env'])
+    env.reset()
+    obs, reward, _, info = env.step(env.action_space.sample())
+    
+    obs_dim = obs['observation'].shape[0]
+    if env.other_args['is_other']:
+        obs_dim -= env.other_args['other_obs_size']
+        obs_dim *= env.other_args['n_concat_images']
+        obs_dim += env.other_args['other_obs_size']
+    else:
+        obs_dim *= env.other_args['n_concat_images']
+
+    dims = {
+        'o': obs_dim,
+        'u': env.action_space.shape[0],
+        'r':0
+    }
+    for key, value in info.items():
+        value = np.array(value)
+        if value.ndim == 0:
+            value = value.reshape(1)
+        dims['info_{}'.format(key)] = value.shape[0]
+    return dims

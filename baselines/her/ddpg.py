@@ -82,12 +82,23 @@ class DDPG(object):
         flat_image_size = image_size * image_size
         print("flat_image_size",flat_image_size)
         self.dim_image = image_size
-        self.dimo = self.input_dims['o']
         self.dim_rgb = n_concat_images*3*flat_image_size # 3 channels and n images concatenated
         self.dim_depth = n_concat_images*flat_image_size
+        self.dimo = self.input_dims['o']
         self.dim_other = self.other_obs_size
         self.dimu = self.input_dims['u']
         self.dim_rd = 1
+        self.image_mode = is_rgb or is_depth or critic_rgb or critic_depth
+
+        # self.full_obs_size = 0
+
+        # if is_other or critic_other:
+        #     self.full_obs_size += self.dim_other
+        # if is_depth or critic_depth:
+        #     self.full_obs_size += self.dim_depth
+        # if is_rgb or critic_rgb:
+        #     self.full_obs_size += self.dim_rgb
+
 
         # Prepare staging area for feeding data to the model.
         stage_shapes = OrderedDict()
@@ -97,6 +108,7 @@ class DDPG(object):
                 continue
             stage_shapes[key] = (None, *input_shapes[key])
         for key in ['o',]:
+            # stage_shapes[key] = (None,self.full_obs_size)
             stage_shapes[key + '_2'] = stage_shapes[key]
         stage_shapes['r'] = (None,)
         self.stage_shapes = stage_shapes
@@ -118,10 +130,10 @@ class DDPG(object):
                          for key, val in input_shapes.items()}
 
         buffer_size = (self.buffer_size // self.rollout_batch_size) * self.rollout_batch_size
-        self.buffer = ReplayBuffer(buffer_shapes, buffer_size, self.T, self.sample_transitions)
+        self.buffer = ReplayBuffer(buffer_shapes, buffer_size, self.T, self.sample_transitions,is_other,other_obs_size,n_concat_images,self.image_mode)
 
         global DEMO_BUFFER
-        DEMO_BUFFER = ReplayBuffer(buffer_shapes, buffer_size, self.T, self.sample_transitions) #initialize the demo buffer; in the same way as the primary data buffer
+        DEMO_BUFFER = ReplayBuffer(buffer_shapes, buffer_size, self.T, self.sample_transitions,is_other,other_obs_size,n_concat_images,self.image_mode) #initialize the demo buffer; in the same way as the primary data buffer
 
     def _random_action(self, n):
         return np.random.uniform(low=-self.max_u, high=self.max_u, size=(n, self.dimu))
@@ -210,7 +222,7 @@ class DDPG(object):
                 # add transitions to normalizer to normalize the demo data as well
                 episode['o_2'] = episode['o'][:, 1:, :]
                 num_normalizing_transitions = transitions_in_episode_batch(episode)
-                transitions = self.sample_transitions(episode, num_normalizing_transitions)
+                transitions = self.sample_transitions(episode, num_normalizing_transitions,self.is_other or self.critic_other,self.other_obs_size,self.n_concat_images,self.image_mode)
 
                 o = transitions['o']
                 transitions['o'] = self._preprocess_og(o)
@@ -242,9 +254,11 @@ class DDPG(object):
             # add transitions to normalizer
             episode_batch['o_2'] = episode_batch['o'][:, 1:, :]
             num_normalizing_transitions = transitions_in_episode_batch(episode_batch)
-            transitions = self.sample_transitions(episode_batch,num_normalizing_transitions)
+            # print("num_normalizing_transitions",num_normalizing_transitions)
+            transitions = self.sample_transitions(episode_batch,num_normalizing_transitions,self.is_other or self.critic_other,self.other_obs_size,self.n_concat_images,self.image_mode)
 
             o = transitions['o']
+            # print("ddpg store o shape",o.shape)
             transitions['o']= self._preprocess_og(o)
             # No need to preprocess the o_2 and g_2 since this is only used for stats
 
