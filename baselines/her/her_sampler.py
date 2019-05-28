@@ -1,7 +1,7 @@
 import numpy as np
 
 def make_sample_her_transitions():
-    def _sample_her_transitions(episode_batch,batch_size_in_transitions,is_other,other_size,n_concat,image_on):
+    def _sample_her_transitions(episode_batch,batch_size_in_transitions,other_on,other_size,n_concat,image_on):
 
         rollout_batch_size = len(episode_batch['u'])
 
@@ -27,16 +27,16 @@ def make_sample_her_transitions():
                 for episode,sample in zip(episode_idxs,t_sample):
                     length = episode_batch[key][0][0].shape[0]
                     if n_concat-1 <= sample:
-                        if is_other:
+                        if other_on:
                             obs = np.concatenate(episode_batch[key][episode][sample-n_concat+1:sample+1,:-1 * other_size])
                             obs = np.concatenate([obs,episode_batch[key][episode][sample][-1*other_size:]])
                         else:
                             obs = np.concatenate(episode_batch[key][episode][sample-n_concat+1:sample+1])
                     else:
-                        if is_other:
+                        if other_on:
                             length -= other_size
                         zeros = np.zeros((length*(n_concat - sample - 1),))
-                        if is_other:
+                        if other_on:
                             obs = np.concatenate(episode_batch[key][episode][:sample+1,:-1 * other_size])
                             obs = np.concatenate([zeros,obs,episode_batch[key][episode][sample][-1*other_size:]])
                         else:

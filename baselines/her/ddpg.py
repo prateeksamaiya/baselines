@@ -89,6 +89,7 @@ class DDPG(object):
         self.dimu = self.input_dims['u']
         self.dim_rd = 1
         self.image_mode = is_rgb or is_depth or critic_rgb or critic_depth
+        self.other_mode = is_other or critic_other
 
         # self.full_obs_size = 0
 
@@ -130,10 +131,10 @@ class DDPG(object):
                          for key, val in input_shapes.items()}
 
         buffer_size = (self.buffer_size // self.rollout_batch_size) * self.rollout_batch_size
-        self.buffer = ReplayBuffer(buffer_shapes, buffer_size, self.T, self.sample_transitions,is_other,other_obs_size,n_concat_images,self.image_mode)
+        self.buffer = ReplayBuffer(buffer_shapes, buffer_size, self.T, self.sample_transitions,self.other_mode,other_obs_size,n_concat_images,self.image_mode)
 
         global DEMO_BUFFER
-        DEMO_BUFFER = ReplayBuffer(buffer_shapes, buffer_size, self.T, self.sample_transitions,is_other,other_obs_size,n_concat_images,self.image_mode) #initialize the demo buffer; in the same way as the primary data buffer
+        DEMO_BUFFER = ReplayBuffer(buffer_shapes, buffer_size, self.T, self.sample_transitions,self.other_mode,other_obs_size,n_concat_images,self.image_mode) #initialize the demo buffer; in the same way as the primary data buffer
 
     def _random_action(self, n):
         return np.random.uniform(low=-self.max_u, high=self.max_u, size=(n, self.dimu))
@@ -222,7 +223,7 @@ class DDPG(object):
                 # add transitions to normalizer to normalize the demo data as well
                 episode['o_2'] = episode['o'][:, 1:, :]
                 num_normalizing_transitions = transitions_in_episode_batch(episode)
-                transitions = self.sample_transitions(episode, num_normalizing_transitions,self.is_other or self.critic_other,self.other_obs_size,self.n_concat_images,self.image_mode)
+                transitions = self.sample_transitions(episode, num_normalizing_transitions,self.other_mode,self.other_obs_size,self.n_concat_images,self.image_mode)
 
                 o = transitions['o']
                 transitions['o'] = self._preprocess_og(o)
@@ -255,7 +256,7 @@ class DDPG(object):
             episode_batch['o_2'] = episode_batch['o'][:, 1:, :]
             num_normalizing_transitions = transitions_in_episode_batch(episode_batch)
             # print("num_normalizing_transitions",num_normalizing_transitions)
-            transitions = self.sample_transitions(episode_batch,num_normalizing_transitions,self.is_other or self.critic_other,self.other_obs_size,self.n_concat_images,self.image_mode)
+            transitions = self.sample_transitions(episode_batch,num_normalizing_transitions,self.other_mode,self.other_obs_size,self.n_concat_images,self.image_mode)
 
             o = transitions['o']
             # print("ddpg store o shape",o.shape)
