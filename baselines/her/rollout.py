@@ -39,6 +39,7 @@ class RolloutWorker:
         self.first_collision_history = deque(maxlen=history_len)
         self.reward_history = deque(maxlen=history_len)
         self.success_history = deque(maxlen=history_len)
+        self.target_reached_history = deque(maxlen=history_len)
         self.collision_history = deque(maxlen=history_len)
         self.epi_len_history = deque(maxlen=history_len)
         self.Q_history = deque(maxlen=history_len)
@@ -158,14 +159,16 @@ class RolloutWorker:
         # print(successes)
 
         successful = np.array(successes)[-1, :]
-        # successful = np.array([np.array(successes).any()])
+        target_reached = np.array([np.array(successes).any()])
         assert successful.shape == (self.rollout_batch_size,)
         success_rate = np.mean(successful)
+        target_reached_rate = np.mean(target_reached)        
         reward_rate = np.mean(np.array(rewards).sum())
         collision_rate = np.mean(np.array(all_collisions))
         self.collision_history.append(collision_rate)
         self.first_collision_history.append(first_collision)
         self.success_history.append(success_rate)
+        self.target_reached_history.append(target_reached_rate)
         self.reward_history.append(reward_rate)
         self.epi_len_history.append(t+1)
         if self.compute_Q:
@@ -178,6 +181,7 @@ class RolloutWorker:
         """Clears all histories that are used for statistics
         """
         self.success_history.clear()
+        self.target_reached_history.clear()
         self.first_collision_history.clear()
         self.collision_history.clear()
         self.epi_len_history.clear()
@@ -207,6 +211,7 @@ class RolloutWorker:
         """
         logs = []
         logs += [('success_rate', np.mean(self.success_history))]
+        logs += [('target_reached_rate', np.mean(self.target_reached_history))]
         logs += [('first_collision', np.mean(self.first_collision_history))]        
         logs += [('collision_rate', np.mean(self.collision_history))]
         logs += [('episode_length', np.mean(self.epi_len_history))]
