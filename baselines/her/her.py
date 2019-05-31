@@ -12,6 +12,7 @@ from baselines.common.mpi_moments import mpi_moments
 import baselines.her.experiment.config as config
 from baselines.her.rollout import RolloutWorker
 import tensorflow as tf
+import psutil
 
 def mpi_average(value,dtype=np.float32):
     if not isinstance(value, list):
@@ -63,6 +64,7 @@ def train(*, policy, rollout_worker, evaluator,
     mean_epoch_time = 0
     mean_rest_time = 0
     for epoch in range(n_epochs):
+        print("memory stat",psutil.virtual_memory())
         epoch_start_time = time.time()
         a = b = c = d = 0.0
         # train
