@@ -13,7 +13,7 @@ import baselines.her.experiment.config as config
 from baselines.her.rollout import RolloutWorker
 import tensorflow as tf
 
-def mpi_average(value,dtype=np.float64):
+def mpi_average(value,dtype=np.float32):
     if not isinstance(value, list):
         value = [value]
     if not any(value):
@@ -23,8 +23,6 @@ def mpi_average(value,dtype=np.float64):
         # print(value[0].dtype)
         dtype = value[0].dtype
     return mpi_moments(np.array(value,dtype=dtype))[0]
-
-
 
 
 def train(*, policy, rollout_worker, evaluator,
@@ -144,7 +142,7 @@ def train(*, policy, rollout_worker, evaluator,
         if rank != 0:
             assert local_uniform[0] != root_uniform[0]
 
-        if epoch%10==0 and rank == 0:
+        if epoch%5==0 and rank == 0:
             path = osp.expanduser(save_path)
             policy.save(path+"/policy_"+str(epoch))
 

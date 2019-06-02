@@ -162,7 +162,7 @@ class RolloutWorker:
         target_reached = np.array([np.array(successes).any()])
         assert successful.shape == (self.rollout_batch_size,)
         success_rate = np.mean(successful)
-        target_reached_rate = np.mean(target_reached)
+        target_reached_rate = np.mean(target_reached)        
         reward_rate = np.mean(np.array(rewards).sum())
         collision_rate = np.mean(np.array(all_collisions))
         self.collision_history.append(collision_rate)
