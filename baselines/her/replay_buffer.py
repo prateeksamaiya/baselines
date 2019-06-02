@@ -32,6 +32,7 @@ class ReplayBuffer:
         self.buffers = {key: [] for key,_ in buffer_shapes.items()}
 
         # memory management
+        self.idx = 0
         self.current_size = 0
         self.n_transitions_stored = 0
 
@@ -74,6 +75,7 @@ class ReplayBuffer:
 
         with self.lock:
             idxs = self._get_storage_idx(batch_size)
+            self.idx = idxs
 
             # load inputs into buffers
             for key in self.buffers.keys():

@@ -13,12 +13,18 @@ import baselines.her.experiment.config as config
 from baselines.her.rollout import RolloutWorker
 import tensorflow as tf
 
-def mpi_average(value):
+def mpi_average(value,dtype=np.float64):
     if not isinstance(value, list):
         value = [value]
     if not any(value):
         value = [0.]
-    return mpi_moments(np.array(value))[0]
+
+    if hasattr(value[0],"dtype"):
+        # print(value[0].dtype)
+        dtype = value[0].dtype
+    return mpi_moments(np.array(value,dtype=dtype))[0]
+
+
 
 
 def train(*, policy, rollout_worker, evaluator,
@@ -111,6 +117,8 @@ def train(*, policy, rollout_worker, evaluator,
         for key, val in policy.logs():
             logger.record_tabular(key, mpi_average(val))
 
+        logger.log(time.time())
+
 
             
 
@@ -118,7 +126,7 @@ def train(*, policy, rollout_worker, evaluator,
             logger.dump_tabular()
 
         # save the policy if it's better than the previous ones
-        success_rate = mpi_average(evaluator.current_success_rate())
+        # success_rate = mpi_average(evaluator.current_success_rate())
         # if rank == 0 and success_rate >= best_success_rate and save_path:
         #     best_success_rate = success_rate
         #     logger.info('New best success rate: {}. Saving policy to {} ...'.format(best_success_rate, best_policy_path))
@@ -238,12 +246,11 @@ def learn(*, network, env, total_timesteps,
     n_cycles = params['n_cycles']
     n_epochs = total_timesteps // n_cycles // rollout_worker.T // rollout_worker.rollout_batch_size
 
-    with tf.device('/device:GPU:0'):
-        return train(
-            save_path=save_path, policy=policy, rollout_worker=rollout_worker,
-            evaluator=evaluator, n_epochs=n_epochs, n_test_rollouts=params['n_test_rollouts'],
-            n_cycles=params['n_cycles'], n_batches=params['n_batches'],
-            policy_save_interval=policy_save_interval, demo_file=demo_file)
+    return train(
+        save_path=save_path, policy=policy, rollout_worker=rollout_worker,
+        evaluator=evaluator, n_epochs=n_epochs, n_test_rollouts=params['n_test_rollouts'],
+        n_cycles=params['n_cycles'], n_batches=params['n_batches'],
+        policy_save_interval=policy_save_interval, demo_file=demo_file)
 
 
 @click.command()

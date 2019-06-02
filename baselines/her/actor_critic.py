@@ -5,8 +5,8 @@ from baselines.her.util import store_args, nn , features, flat_process_input,fla
 
 class ActorCritic:
     @store_args
-    def __init__(self, inputs_tf,penulti_linear,feature_size,hidden, layers,other_obs_size,n_concat_images,is_rgb,is_depth,is_other,
-        critic_rgb,critic_depth,critic_other,rgb_stats=None,depth_stats=None,g_stats=None,**kwargs):
+    def __init__(self, inputs_tf,penulti_linear,feature_size,hidden, layers,other_obs_size,n_concat_images,is_rgb,is_depth,is_other,is_pos,
+        critic_rgb,critic_depth,critic_other,critic_pos,rgb_stats=None,depth_stats=None,g_stats=None,**kwargs):
         """The actor-critic network and related training code.
 
         Args:
@@ -59,6 +59,9 @@ class ActorCritic:
 
             if is_other:
                 pi_inputs.append(self.other)
+
+            if is_pos:
+                pi_inputs.append(self.other[:,:3])
             
             self.input_pi = tf.concat(axis=1, values=pi_inputs+[g])  # for actor
 
@@ -80,6 +83,9 @@ class ActorCritic:
 
             if critic_other:
                 Q_inputs.append(self.other)
+
+            if critic_pos:
+                Q_inputs.append(self.other[:,:3])
 
             # for policy training
             # input_Q = tf.concat(axis=1, values=[tf.stop_gradient(self.rgb_vec),tf.stop_gradient(self.depth_vec),self.other, g, self.pi_tf / self.max_u]) #stop gradient used

@@ -507,11 +507,27 @@ class DDPG(object):
             self.pred_depth_adam = MpiAdam(self._vars('pred_depth'), scale_grad_by_procs=False)
     
 
+        stat_vars = None
+
+        if self.is_rgb or self.critic_rgb:
+            stat_vars = self._global_vars('rgb_stats') 
+
+        if self.is_depth or self.critic_depth:
+            if stat_vars:
+                stat_vars +=  self._global_vars('depth_stats')
+            else:
+                stat_vars =  self._global_vars('depth_stats')
+
+        if self.is_other or self.critic_other:
+            if stat_vars:
+                stat_vars +=  self._global_vars('other_stats')
+            else:
+                stat_vars =  self._global_vars('other_stats')
 
         # polyak averaging
         self.main_vars = self._vars('main/Q') + self._vars('main/pi')
         self.target_vars = self._vars('target/Q') + self._vars('target/pi')
-        self.stats_vars = self._global_vars('rgb_stats') + self._global_vars('depth_stats')+ self._global_vars('other_stats')+ self._global_vars('g_stats')
+        self.stats_vars = stat_vars
         self.init_target_net_op = list(map(lambda v: v[0].assign(v[1]), zip(self.target_vars, self.main_vars)))
         self.update_target_net_op = list(map(lambda v: v[0].assign(self.polyak * v[0] + (1. - self.polyak) * v[1]), zip(self.target_vars, self.main_vars)))
 
@@ -536,6 +552,8 @@ class DDPG(object):
             logs += [('stats_rd_stats/std', np.mean(self.sess.run([self.rd_stats.std])))]
         logs += [('stats_g/mean', np.mean(self.sess.run([self.g_stats.mean])))]
         logs += [('stats_g/std', np.mean(self.sess.run([self.g_stats.std])))]
+
+        print(self.buffer.current_size,self.buffer.idx)
         
         if prefix != '' and not prefix.endswith('/'):
             return [(prefix + '/' + key, val) for key, val in logs]
