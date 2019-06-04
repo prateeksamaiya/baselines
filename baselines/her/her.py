@@ -13,12 +13,15 @@ import baselines.her.experiment.config as config
 from baselines.her.rollout import RolloutWorker
 import tensorflow as tf
 
-def mpi_average(value):
+def mpi_average(value,dtype=np.float64):
     if not isinstance(value, list):
         value = [value]
     if not any(value):
         value = [0.]
-    return mpi_moments(np.array(value))[0]
+
+    if hasattr(value[0],"dtype"):
+        dtype = value[0].dtype
+    return mpi_moments(np.array(value,dtype=dtype))[0]
 
 
 def train(*, policy, rollout_worker, evaluator,
@@ -118,7 +121,7 @@ def train(*, policy, rollout_worker, evaluator,
             logger.dump_tabular()
 
         # save the policy if it's better than the previous ones
-        success_rate = mpi_average(evaluator.current_success_rate())
+        # success_rate = mpi_average(evaluator.current_success_rate())
         # if rank == 0 and success_rate >= best_success_rate and save_path:
         #     best_success_rate = success_rate
         #     logger.info('New best success rate: {}. Saving policy to {} ...'.format(best_success_rate, best_policy_path))

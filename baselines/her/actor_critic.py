@@ -59,6 +59,9 @@ class ActorCritic:
 
             if is_other:
                 pi_inputs.append(self.other)
+
+            #addding pos
+            pi_inputs.append(self.other[:,:3])
             
             self.input_pi = tf.concat(axis=1, values=pi_inputs+[g])  # for actor
 
