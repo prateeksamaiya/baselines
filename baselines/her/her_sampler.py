@@ -16,7 +16,7 @@ def make_sample_her_transitions(replay_strategy, replay_k, reward_fun):
     else:  # 'replay_strategy' == 'none'
         future_p = 0
 
-    def _sample_her_transitions(episode_batch,batch_size_in_transitions):
+    def _sample_her_transitions(episode_batch,batch_size_in_transitions,image_on,other_on,n_concat,other_size):
         """episode_batch is {key: array(buffer_size x T x dim_key)}
         """
         # print(episode_batch.keys())
@@ -39,22 +39,62 @@ def make_sample_her_transitions(replay_strategy, replay_k, reward_fun):
         epi_len = np.array([episode_batch['u'][x].shape[0] for x in episode_idxs])
 
         t_samples = np.random.uniform(0,epi_len,batch_size).astype(int)
+        t_sam = t_samples
 
         # t_samples = t_samples%epi_len
 
         transitions = {}
 
+        # for key in episode_batch.keys():
+        #     transitions[key] = np.array([episode_batch[key][episode][sample] for episode,sample in zip(episode_idxs,t_samples)])
+
         for key in episode_batch.keys():
+            if key == 'o' or key == 'o_2':
+                continue
             transitions[key] = np.array([episode_batch[key][episode][sample] for episode,sample in zip(episode_idxs,t_samples)])
-            
-            
+
+
+        for key in ['o','o_2']:
+
+            #generating next observation from observation
+            if key == 'o_2':
+                store_key = 'o_2'
+                key = 'o'
+                t_samples = t_samples+1
+            else:
+                store_key = key
+
+            if image_on:
+                key_list = []
+                for episode,sample in zip(episode_idxs,t_samples):
+                    length = episode_batch[key][0][0].shape[0]
+                    if n_concat-1 <= sample:
+                        if other_on:
+                            obs = np.concatenate(episode_batch[key][episode][sample-n_concat+1:sample+1,:-1 * other_size])
+                            obs = np.concatenate([obs,episode_batch[key][episode][sample][-1*other_size:]])
+                        else:
+                            obs = np.concatenate(episode_batch[key][episode][sample-n_concat+1:sample+1])
+                    else:
+                        if other_on:
+                            length -= other_size
+                        zeros = np.zeros((length*(n_concat - sample - 1),))
+                        if other_on:
+                            obs = np.concatenate(episode_batch[key][episode][:sample+1,:-1 * other_size])
+                            obs = np.concatenate([zeros,obs,episode_batch[key][episode][sample][-1*other_size:]])
+                        else:
+                            obs = np.concatenate(episode_batch[key][episode][:sample+1])
+                            obs = np.concatenate([zeros,obs])
+                    key_list.append(obs.copy())
+                transitions[store_key] = np.array(key_list)
+            else:
+                transitions[store_key] = np.array([episode_batch[key][episode][sample] for episode,sample in zip(episode_idxs,t_samples)])
 
         # Select future time indexes proportional with probability future_p. These
         # will be used for HER replay by substituting in future goals.
         her_indexes = np.where(np.random.uniform(size=batch_size) < future_p)[0]
-        future_offset = np.random.uniform(size=batch_size) * (epi_len - t_samples)
+        future_offset = np.random.uniform(size=batch_size) * (epi_len - t_sam)
         future_offset = future_offset.astype(int)
-        future_t = (t_samples + 1 + future_offset)[her_indexes]
+        future_t = (t_sam + 1 + future_offset)[her_indexes]
 
 
 

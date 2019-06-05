@@ -4,7 +4,7 @@ import numpy as np
 
 
 class ReplayBuffer:
-    def __init__(self, buffer_shapes, size_in_transitions, T, sample_transitions):
+    def __init__(self, buffer_shapes, size_in_transitions, T, sample_transitions,image_on,other_on,n_concat_images,other_obs_size):
         """Creates a replay buffer.
 
         Args:
@@ -20,6 +20,11 @@ class ReplayBuffer:
         self.size = size_in_transitions // T
         self.T = T
         self.sample_transitions = sample_transitions
+        self.image_on = image_on
+        self.other_on = other_on
+        self.n_concat_images = n_concat_images
+        self.other_obs_size = other_obs_size
+
 
         # print("buffer_shapes",buffer_shapes)
         # print("size in transition",size_in_transitions)
@@ -54,11 +59,11 @@ class ReplayBuffer:
                 buffers[key] = (self.buffers[key][:self.current_size])
 
 
-        buffers['o_2'] = [ x[1:] for x in buffers['o']]
+        # buffers['o_2'] = [ x[1:] for x in buffers['o']]
         buffers['ag_2'] = [ x[1:] for x in buffers['ag']]
         
 
-        transitions = self.sample_transitions(buffers,batch_size)
+        transitions = self.sample_transitions(buffers,batch_size,self.image_on,self.other_on,self.n_concat_images,self.other_obs_size)
 
         for key in (['r', 'o_2', 'ag_2'] + list(self.buffers.keys())):
             assert key in transitions, "key %s missing from transitions" % key

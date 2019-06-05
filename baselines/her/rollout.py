@@ -51,6 +51,7 @@ class RolloutWorker:
     def reset_all_rollouts(self):
         self.obs_dict = self.venv.reset()
         self.initial_o = self.obs_dict['observation']
+        self.initial_c = self.obs_dict['current_obs']
         self.initial_ag = self.obs_dict['achieved_goal']
         self.g = self.obs_dict['desired_goal']
 
@@ -64,6 +65,7 @@ class RolloutWorker:
         o = np.empty((self.rollout_batch_size, self.dims['o']), np.float32)  # observations
         ag = np.empty((self.rollout_batch_size, self.dims['g']), np.float32)  # achieved goals
         o[:] = self.initial_o
+        c = self.initial_c
         ag[:] = self.initial_ag
 
         # generate episodes
@@ -100,6 +102,7 @@ class RolloutWorker:
             # compute new states and observations
             obs_dict_new, reward, done, info = self.venv.step(u)
             o_new = obs_dict_new['observation']
+            c_new = obs_dict_new['current_obs']
             ag_new = obs_dict_new['achieved_goal']
             success = np.array([i.get('is_success', 0.0) for i in info])
             collision = np.array([i.get('collision', 0.0) for i in info])
@@ -131,17 +134,18 @@ class RolloutWorker:
 
             dones.append(done)
             rewards.append(reward)
-            obs.append(o.copy())
+            obs.append(c.copy())
             achieved_goals.append(ag.copy())
             successes.append(success.copy())
             all_collisions.append(collision.copy())
             acts.append(u.copy())
             goals.append(self.g.copy())
             o[...] = o_new
+            c[...] = c_new
             ag[...] = ag_new
 
 
-        obs.append(o.copy())
+        obs.append(c.copy())
         achieved_goals.append(ag.copy())
 
         episode = dict(o=obs,

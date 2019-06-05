@@ -26,8 +26,8 @@ class DDPG(object):
                  Q_lr, pi_lr, norm_eps, norm_clip, max_u, action_l2, clip_obs, scope, T,
                  rollout_batch_size, subtract_goals, relative_goals, clip_pos_returns, clip_return,
                  bc_loss, q_filter, num_demo, demo_batch_size, prm_loss_weight, aux_loss_weight,
-                 sample_transitions, gamma,penulti_linear,feature_size,other_obs_size,n_concat_images,image_size,is_rgb,is_depth,is_other,is_pred_depth,critic_depth,
-                 critic_rgb,critic_other,reuse=False,**kwargs):
+                 sample_transitions, gamma,penulti_linear,feature_size,other_obs_size,n_concat_images,image_size,is_rgb,is_depth,is_other,is_pos,is_pred_depth,critic_depth,
+                 critic_rgb,critic_other,critic_pos,reuse=False,**kwargs):
         """Implementation of DDPG that is used in combination with Hindsight Experience Replay (HER).
             Added functionality to use demonstrations for training to Overcome exploration problem.
 
@@ -90,6 +90,9 @@ class DDPG(object):
         self.dimu = self.input_dims['u']
         self.dim_rd = 1
 
+        self.image_on = is_rgb or is_depth or critic_depth or critic_rgb
+        self.other_on = is_other or critic_other or is_pos or critic_pos
+
         # Prepare staging area for feeding data to the model.
         stage_shapes = OrderedDict()
 
@@ -119,10 +122,10 @@ class DDPG(object):
         buffer_shapes['ag'] = (self.T, self.dimg)
 
         buffer_size = (self.buffer_size // self.rollout_batch_size) * self.rollout_batch_size
-        self.buffer = ReplayBuffer(buffer_shapes, buffer_size, self.T, self.sample_transitions)
+        self.buffer = ReplayBuffer(buffer_shapes, buffer_size, self.T, self.sample_transitions,self.image_on,self.other_on,n_concat_images,other_obs_size)
 
         global DEMO_BUFFER
-        DEMO_BUFFER = ReplayBuffer(buffer_shapes, buffer_size, self.T, self.sample_transitions) #initialize the demo buffer; in the same way as the primary data buffer
+        DEMO_BUFFER = ReplayBuffer(buffer_shapes, buffer_size, self.T, self.sample_transitions,self.image_on,self.other_on,n_concat_images,other_obs_size) #initialize the demo buffer; in the same way as the primary data buffer
 
     def _random_action(self, n):
         return np.random.uniform(low=-self.max_u, high=self.max_u, size=(n, self.dimu))
@@ -222,7 +225,7 @@ class DDPG(object):
                 episode['o_2'] = episode['o'][:, 1:, :]
                 episode['ag_2'] = episode['ag'][:, 1:, :]
                 num_normalizing_transitions = transitions_in_episode_batch(episode)
-                transitions = self.sample_transitions(episode, num_normalizing_transitions)
+                transitions = self.sample_transitions(episode, num_normalizing_transitions,self.image_on,self.other_on,self.n_concat_images,self.other_obs_size)
 
                 o, g, ag = transitions['o'], transitions['g'], transitions['ag']
                 transitions['o'], transitions['g'] = self._preprocess_og(o, ag, g)
@@ -258,7 +261,7 @@ class DDPG(object):
             episode_batch['ag_2'] = episode_batch['ag'][:, 1:, :]
             num_normalizing_transitions = transitions_in_episode_batch(episode_batch)
             # print("num_normalizing_transitions",num_normalizing_transitions)
-            transitions = self.sample_transitions(episode_batch,num_normalizing_transitions)
+            transitions = self.sample_transitions(episode_batch,num_normalizing_transitions,self.image_on,self.other_on,self.n_concat_images,self.other_obs_size)
 
             o, g, ag = transitions['o'], transitions['g'], transitions['ag']
             transitions['o'], transitions['g'] = self._preprocess_og(o, ag, g)
