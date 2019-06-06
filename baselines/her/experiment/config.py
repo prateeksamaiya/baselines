@@ -35,6 +35,7 @@ DEFAULT_PARAMS = {
     'n_batches': 40,  # training batches per cycle
     'batch_size': 256,  # per mpi thread, measured in transitions and reduced to even multiple of chunk_length.
     'n_test_rollouts': 10,  # number of test rollouts per epoch, each consists of rollout_batch_size rollouts
+    'n_other_test_rollouts':5,
     'test_with_polyak': False,  # run test episodes with the target network
     # exploration
     'random_eps': 0.3,  # percentage of time a random action is taken
@@ -180,6 +181,7 @@ def configure_ddpg(dims, params, reuse=False, use_mpi=True, clip_return=True):
         'env_name': params['env_name'],
     }
 
+    print(type(env),"inside ddpg config")
     ddpg_params.update(env.other_args)
     policy = DDPG(reuse=reuse, **ddpg_params, use_mpi=use_mpi)
     return policy

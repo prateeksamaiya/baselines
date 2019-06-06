@@ -18,10 +18,14 @@ class DummyVecEnv(VecEnv):
         """
         self.envs = [fn() for fn in env_fns]
         env = self.envs[0]
+
+        print("dummy_env_vec...............env",type(env))
+        self.other_args = env.other_args
         VecEnv.__init__(self, len(env_fns), env.observation_space, env.action_space)
         obs_space = env.observation_space
         self.keys, shapes, dtypes = obs_space_info(obs_space)
-
+        self.ini_offset = 0
+        self.monitor_env = env
         self.buf_obs = { k: np.zeros((self.num_envs,) + tuple(shapes[k]), dtype=dtypes[k]) for k in self.keys }
         self.buf_dones = np.zeros((self.num_envs,), dtype=np.bool)
         self.buf_rews  = np.zeros((self.num_envs,), dtype=np.float32)
@@ -57,6 +61,7 @@ class DummyVecEnv(VecEnv):
                 self.buf_infos.copy())
 
     def reset(self):
+        self.monitor_env.ini_offset = self.ini_offset
         for e in range(self.num_envs):
             obs = self.envs[e].reset()
             self._save_obs(e, obs)

@@ -10,9 +10,9 @@ from baselines.her.util import convert_episode_to_batch_major, store_args
 class RolloutWorker:
 
     @store_args
-    def __init__(self, venv, policy, dims, logger, T, rollout_batch_size=1,
+    def __init__(self, venv, policy, dims, logger, T,ini_offset,rollout_batch_size=1,
                  exploit=False, use_target_net=False, compute_Q=False, noise_eps=0,
-                 random_eps=0, history_len=100, render=False, monitor=False, **kwargs):
+                 random_eps=0, history_len=100, render=False, monitor=False,**kwargs):
         """Rollout worker generates experience by interacting with one or many environments.
 
         Args:
@@ -48,12 +48,16 @@ class RolloutWorker:
         self.reset_all_rollouts()
         self.clear_history()
 
+
     def reset_all_rollouts(self):
+        self.venv.ini_offset = self.ini_offset
         self.obs_dict = self.venv.reset()
         self.initial_o = self.obs_dict['observation']
         self.initial_c = self.obs_dict['current_obs']
         self.initial_ag = self.obs_dict['achieved_goal']
         self.g = self.obs_dict['desired_goal']
+
+        
 
     def generate_rollouts(self):
         """Performs `rollout_batch_size` rollouts in parallel for time horizon `T` with the current
@@ -84,7 +88,7 @@ class RolloutWorker:
                 compute_Q=self.compute_Q,
                 noise_eps=self.noise_eps if not self.exploit else 0.,
                 random_eps=self.random_eps if not self.exploit else 0.,
-                use_target_net=self.use_target_net)
+                use_target_net=self.use_target_net,test=self.pred_depth)
 
             if self.compute_Q:
                 u, Q = policy_output
