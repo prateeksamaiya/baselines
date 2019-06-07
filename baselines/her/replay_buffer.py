@@ -58,7 +58,7 @@ class ReplayBuffer:
                 buffers[key] = (self.buffers[key][:self.current_size])
 
 
-        buffers['o_2'] = [ x[1:] for x in buffers['o']]
+        # buffers['o_2'] = [ x[1:] for x in buffers['o']]
         
 
         transitions = self.sample_transitions(buffers,batch_size,self.is_other,self.other_obs,self.n_concat,self.image_mode)

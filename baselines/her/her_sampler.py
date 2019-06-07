@@ -11,20 +11,29 @@ def make_sample_her_transitions():
 
         epi_len = np.array([episode_batch['u'][x].shape[0] for x in episode_idxs])
 
-        t_sample = np.random.uniform(0,epi_len,batch_size).astype(int)
+        t_samples = np.random.uniform(0,epi_len,batch_size).astype(int)
 
         transitions = {}
 
         for key in episode_batch.keys():
             if key == 'o' or key == 'o_2':
                 continue
-            transitions[key] = np.array([episode_batch[key][episode][sample] for episode,sample in zip(episode_idxs,t_sample)])
+            transitions[key] = np.array([episode_batch[key][episode][sample] for episode,sample in zip(episode_idxs,t_samples)])
 
 
         for key in ['o','o_2']:
+
+            #generating next observation from observation
+            if key == 'o_2':
+                store_key = 'o_2'
+                key = 'o'
+                t_samples = t_samples+1
+            else:
+                store_key = key
+
             if image_on:
                 key_list = []
-                for episode,sample in zip(episode_idxs,t_sample):
+                for episode,sample in zip(episode_idxs,t_samples):
                     length = episode_batch[key][0][0].shape[0]
                     if n_concat-1 <= sample:
                         if other_on:
@@ -43,9 +52,9 @@ def make_sample_her_transitions():
                             obs = np.concatenate(episode_batch[key][episode][:sample+1])
                             obs = np.concatenate([zeros,obs])
                     key_list.append(obs.copy())
-                transitions[key] = np.array(key_list)
+                transitions[store_key] = np.array(key_list)
             else:
-                transitions[key] = np.array([episode_batch[key][episode][sample] for episode,sample in zip(episode_idxs,t_sample)])
+                transitions[store_key] = np.array([episode_batch[key][episode][sample] for episode,sample in zip(episode_idxs,t_samples)])
 
 
 

@@ -12,7 +12,6 @@ from baselines.common.mpi_moments import mpi_moments
 import baselines.her.experiment.config as config
 from baselines.her.rollout import RolloutWorker
 import tensorflow as tf
-import psutil
 
 def mpi_average(value,dtype=np.float32):
     if not isinstance(value, list):
@@ -26,9 +25,9 @@ def mpi_average(value,dtype=np.float32):
     return mpi_moments(np.array(value,dtype=dtype))[0]
 
 
-def train(*, policy, rollout_worker, evaluator,
-          n_epochs, n_test_rollouts, n_cycles, n_batches, policy_save_interval,
-          save_path, demo_file, **kwargs):
+def train(*, policy, rollout_worker, evaluator,pred_depth_evaluator,test_eval,real_eval,pred_depth_test_eval,pred_depth_real_eval,
+          n_epochs, n_test_rollouts,n_other_test_rollouts, n_cycles, n_batches, policy_save_interval,
+          save_path, demo_file,is_real_eval,is_test_eval,is_pred_depth,**kwargs):
     rank = MPI.COMM_WORLD.Get_rank()
 
 
@@ -64,13 +63,11 @@ def train(*, policy, rollout_worker, evaluator,
     mean_epoch_time = 0
     mean_rest_time = 0
     for epoch in range(n_epochs):
-        print("memory stat",psutil.virtual_memory())
         epoch_start_time = time.time()
         a = b = c = d = 0.0
         # train
         rollout_worker.clear_history()
         for count in range(n_cycles):
-            # print(rank,count)
             # print(count)
             rollout_start_time = time.time()
             episode = rollout_worker.generate_rollouts()
@@ -109,6 +106,18 @@ def train(*, policy, rollout_worker, evaluator,
         for _ in range(n_test_rollouts):
             evaluator.generate_rollouts()
 
+        # test in env similar to train env
+        if is_test_eval:
+            test_eval.clear_history()
+            for _ in range(n_other_test_rollouts):
+                test_eval.generate_rollouts()
+
+        # test in env with more realistic obstacles
+        if is_real_eval:
+            real_eval.clear_history()
+            for _ in range(n_other_test_rollouts):
+                real_eval.generate_rollouts()
+
         # record logs
         logger.record_tabular('epoch', epoch)
         for key, val in evaluator.logs('test'):
@@ -118,8 +127,43 @@ def train(*, policy, rollout_worker, evaluator,
         for key, val in policy.logs():
             logger.record_tabular(key, mpi_average(val))
 
+        if is_test_eval:
+            for key, val in test_eval.logs('test_eval'):
+                logger.record_tabular(key, mpi_average(val))
+        if is_real_eval:
+            for key, val in real_eval.logs('real_eval'):
+                logger.record_tabular(key, mpi_average(val))
 
-            
+
+        if is_pred_depth:
+            pred_depth_evaluator.clear_history()
+            for _ in range(n__test_rollouts):
+                pred_depth_evaluator.generate_rollouts()
+
+            for key, val in pred_depth_evaluator.logs('pred_depth_test'):
+                logger.record_tabular(key, mpi_average(val))
+
+            # test in env similar to train env
+            if is_test_eval:
+                pred_depth_test_eval.clear_history()
+                for _ in range(n_other_test_rollouts):
+                    pred_depth_test_eval.generate_rollouts()
+
+            # test in env with more realistic obstacles
+            if is_real_eval:
+                pred_depth_real_eval.clear_history()
+                for _ in range(n_other_test_rollouts):
+                    pred_depth_real_eval.generate_rollouts()
+
+            if is_test_eval:
+                for key, val in pred_depth_test_eval.logs('pred_depth_test_eval'):
+                    logger.record_tabular(key, mpi_average(val))
+
+            if is_real_eval:
+                for key, val in pred_depth_real_eval.logs('pred_depth_real_eval'):
+                    logger.record_tabular(key, mpi_average(val))
+
+        logger.log(time.time())
 
         if rank == 0:
             logger.dump_tabular()
@@ -213,8 +257,7 @@ def learn(*, network, env, total_timesteps,
         logger.warn()
 
     dims = config.configure_dims(params)
-    policy_dims = config.configure_dims(params)
-    policy = config.configure_ddpg(dims=policy_dims, params=params, clip_return=clip_return)
+    policy = config.configure_ddpg(dims=dims, params=params, clip_return=clip_return)
     if load_path is not None:
         tf_util.load_variables(load_path)
 
@@ -224,6 +267,7 @@ def learn(*, network, env, total_timesteps,
         'use_demo_states': True,
         'compute_Q': False,
         'T': params['T'],
+        'pred_depth':False,
     }
 
     eval_params = {
@@ -232,6 +276,7 @@ def learn(*, network, env, total_timesteps,
         'use_demo_states': False,
         'compute_Q': True,
         'T': params['T'],
+        'pred_depth':False,
     }
 
     for name in ['T', 'rollout_batch_size', 'gamma', 'noise_eps', 'random_eps']:
@@ -240,18 +285,50 @@ def learn(*, network, env, total_timesteps,
 
     eval_env = eval_env or env
 
+    print(type(env))
+
+    bebop_other_args = env.other_args
+
+    test_eval = None
+    real_eval = None
+
+    rollout_params["ini_offset"] = 0
     rollout_worker = RolloutWorker(env, policy, dims, logger, monitor=True, **rollout_params)
+    eval_params["ini_offset"] = 0
     evaluator = RolloutWorker(eval_env, policy, dims, logger, **eval_params)
+    if bebop_other_args['is_test_eval']:
+        eval_params["ini_offset"] = 5
+        test_eval = RolloutWorker(eval_env, policy, dims, logger, **eval_params)
+    if bebop_other_args['is_real_eval']:
+        eval_params["ini_offset"] = -5
+        real_eval = RolloutWorker(eval_env, policy, dims, logger, **eval_params)
+
+
+    pred_depth_evaluator = None
+    pred_depth_test_eval = None
+    pred_depth_real_eval = None
+    if bebop_other_args['is_pred_depth']:
+        eval_params['pred_depth'] = True
+        eval_params["ini_offset"] = 0
+        pred_depth_evaluator = RolloutWorker(eval_env, policy, dims, logger, **eval_params)
+        if bebop_other_args['is_test_eval']:
+            eval_params["ini_offset"] = 5
+            pred_depth_test_eval = RolloutWorker(eval_env, policy, dims, logger, **eval_params)
+        if bebop_other_args['is_real_eval']:
+            eval_params["ini_offset"] = -5
+            pred_depth_real_eval = RolloutWorker(eval_env, policy, dims, logger, **eval_params)
+    
+
 
     n_cycles = params['n_cycles']
     n_epochs = total_timesteps // n_cycles // rollout_worker.T // rollout_worker.rollout_batch_size
 
-    with tf.device('/device:GPU:0'):   
-        return train(
-            save_path=save_path, policy=policy, rollout_worker=rollout_worker,
-            evaluator=evaluator, n_epochs=n_epochs, n_test_rollouts=params['n_test_rollouts'],
-            n_cycles=params['n_cycles'], n_batches=params['n_batches'],
-            policy_save_interval=policy_save_interval, demo_file=demo_file)
+    return train(
+        save_path=save_path, policy=policy, rollout_worker=rollout_worker,
+        evaluator=evaluator,pred_depth_evaluator=pred_depth_evaluator,test_eval=test_eval,real_eval=real_eval,pred_depth_test_eval=pred_depth_test_eval,pred_depth_real_eval=pred_depth_real_eval, n_epochs=n_epochs,
+        n_other_test_rollouts=params['n_other_test_rollouts'], n_test_rollouts=params['n_test_rollouts'],
+        n_cycles=params['n_cycles'], n_batches=params['n_batches'],
+        policy_save_interval=policy_save_interval, demo_file=demo_file,**bebop_other_args)
 
 
 @click.command()

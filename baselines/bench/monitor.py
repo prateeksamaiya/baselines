@@ -21,6 +21,10 @@ class Monitor(Wrapper):
             header={"t_start": time.time(), 'env_id' : env.spec and env.spec.id},
             extra_keys=reset_keywords + info_keywords
         )
+
+        print("Monitor.........",env)
+        self.ini_offset = 0
+        self.other_args = env.other_args
         self.reset_keywords = reset_keywords
         self.info_keywords = info_keywords
         self.allow_early_resets = allow_early_resets
@@ -30,10 +34,12 @@ class Monitor(Wrapper):
         self.episode_lengths = []
         self.episode_times = []
         self.other_args = env.other_args
+        self.time_limit_env = env
         self.total_steps = 0
         self.current_reset_info = {} # extra info about the current episode, that was passed in during reset()
 
     def reset(self, **kwargs):
+        self.time_limit_env.ini_offset = self.ini_offset
         self.reset_state()
         for k in self.reset_keywords:
             v = kwargs.get(k)
