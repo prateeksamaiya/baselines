@@ -82,7 +82,7 @@ class DDPG(object):
         flat_image_size = image_size * image_size
         print("flat_image_size",flat_image_size)
         self.dim_image = image_size
-        self.dim_rgb = n_concat_images*3*flat_image_size # 3 channels and n images concatenated
+        self.dim_rgb = n_concat_images*1*flat_image_size # 3 channels and n images concatenated
         self.dim_depth = n_concat_images*flat_image_size
         self.dimo = self.input_dims['o']
         self.dim_other = self.other_obs_size
@@ -152,7 +152,7 @@ class DDPG(object):
         o = self._preprocess_og(o)
 
         if test:
-            print("called")
+            # print("called")
             policy = self.target_test if use_target_net else self.main_test
         else:
             policy= self.target if use_target_net else self.main
@@ -299,8 +299,8 @@ class DDPG(object):
         output = self.sess.run(input)
 
         if self.is_pred_depth:
-            self.rd_stats.update(output['pred_depth_loss'])
-            self.rd_stats.recompute_stats()
+            self.rd_loss.update(output['pred_depth_loss'])
+            self.rd_loss.recompute_stats()
 
         return output
 
@@ -309,7 +309,7 @@ class DDPG(object):
         self.Q_adam.update(Q_grad, self.Q_lr)
         self.pi_adam.update(pi_grad, self.pi_lr)
         if self.is_pred_depth:
-            self.pred_depth_adam.update(pred_depth_grad, self.pi_lr)
+            self.pred_depth_adam.update(pred_depth_grad, self.Q_lr)
 
     def sample_batch(self):
 
@@ -340,7 +340,7 @@ class DDPG(object):
 
 
     def train(self, stage=True):
-        # writer = tf.summary.FileWriter('/home/patrick/Desktop/tensorboard/', self.sess.graph)
+        # writer = tf.summary.FileWriter('/home/vision/tensorboard/', self.sess.graph)
         if stage:
             self.stage_batch()
        
@@ -393,10 +393,10 @@ class DDPG(object):
                     vs.reuse_variables()
                 self.other_stats = Normalizer(self.dim_other, self.norm_eps, self.norm_clip, sess=self.sess)
         if self.is_pred_depth:
-            with tf.variable_scope('rd_stats') as vs:
+            with tf.variable_scope('rd_loss') as vs:
                 if reuse:
                     vs.reuse_variables()
-                self.rd_stats = Normalizer(self.dim_rd, self.norm_eps, self.norm_clip, sess=self.sess)
+                self.rd_loss = Normalizer(self.dim_rd, self.norm_eps, self.norm_clip, sess=self.sess)
     
 
         # mini-batch sampling.
@@ -427,7 +427,7 @@ class DDPG(object):
         if self.is_pred_depth:
             output_size = self.feature_size
             with tf.variable_scope("pred_depth") as vs:
-                self.pred_depth_vec = nn(tf.stop_gradient(self.main.rgb_vec), [self.hidden] * self.layers + [output_size], reuse=False)
+                self.pred_depth_vec = nn(self.main.pi_rgb_vec, [self.hidden] * self.layers + [output_size], reuse=False)
 
         
             
@@ -470,14 +470,14 @@ class DDPG(object):
         
         #pred_depth_loss
         if self.is_pred_depth:
-            self.pred_depth_loss = tf.losses.mean_squared_error(tf.stop_gradient(self.main.depth_vec),self.pred_depth_vec)
+            self.pred_depth_loss = tf.losses.mean_squared_error(tf.stop_gradient(self.main.pi_depth_vec),self.pred_depth_vec)
 
 
         if self.is_pred_depth:
-            pred_depth_grads_tf = tf.gradients(self.pred_depth_loss, self._vars('pred_depth'))
-            assert len(self._vars('pred_depth')) == len(pred_depth_grads_tf)
-            self.pred_depth_grads_vars_tf = zip(pred_depth_grads_tf, self._vars('pred_depth'))
-            self.pred_depth_grad_tf = flatten_grads(grads=pred_depth_grads_tf, var_list=self._vars('pred_depth'))
+            pred_depth_grads_tf = tf.gradients(self.pred_depth_loss, self._vars('pred_depth')+self._vars('main/pi/rgb'))
+            assert len(self._vars('pred_depth')+self._vars('main/pi/rgb')) == len(pred_depth_grads_tf)
+            self.pred_depth_grads_vars_tf = zip(pred_depth_grads_tf, self._vars('pred_depth')+self._vars('main/pi/rgb'))
+            self.pred_depth_grad_tf = flatten_grads(grads=pred_depth_grads_tf, var_list=self._vars('pred_depth')+self._vars('main/pi/rgb'))
 
         Q_grads_tf = tf.gradients(self.Q_loss_tf, self._vars('main/Q'))
         assert len(self._vars('main/Q')) == len(Q_grads_tf)
@@ -495,7 +495,7 @@ class DDPG(object):
         self.Q_adam = MpiAdam(self._vars('main/Q'), scale_grad_by_procs=False)
         self.pi_adam = MpiAdam(self._vars('main/pi'), scale_grad_by_procs=False)
         if self.is_pred_depth:
-            self.pred_depth_adam = MpiAdam(self._vars('pred_depth'), scale_grad_by_procs=False)
+            self.pred_depth_adam = MpiAdam(self._vars('pred_depth')+self._vars('main/pi/rgb'), scale_grad_by_procs=False)
     
         stat_vars = None
 
@@ -538,8 +538,8 @@ class DDPG(object):
             logs += [('stats_other/mean', np.mean(self.sess.run([self.other_stats.mean])))]
             logs += [('stats_other/std', np.mean(self.sess.run([self.other_stats.std])))]
         if self.is_pred_depth:
-            logs += [('stats_rd_stats/mean', np.mean(self.sess.run([self.rd_stats.mean])))]
-            logs += [('stats_rd_stats/std', np.mean(self.sess.run([self.rd_stats.std])))]
+            logs += [('stats_rd_loss/mean', np.mean(self.sess.run([self.rd_loss.mean])))]
+            logs += [('stats_rd_loss/std', np.mean(self.sess.run([self.rd_loss.std])))]
         
         if prefix != '' and not prefix.endswith('/'):
             return [(prefix + '/' + key, val) for key, val in logs]

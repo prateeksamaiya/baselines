@@ -34,7 +34,7 @@ class ActorCritic:
         # Prepare inputs for actor and critic.
         if is_rgb or critic_rgb:
             rgb_img = self.rgb_stats.normalize(flat_obs['rgb'])
-            self.rgb_img = tf.reshape(rgb_img,[-1,self.dim_image,self.dim_image,3*n_concat_images])
+            self.rgb_img = tf.reshape(rgb_img,[-1,self.dim_image,self.dim_image,n_concat_images])
         if is_depth or critic_depth:
             depth_img = self.depth_stats.normalize(flat_obs['depth'])
             self.depth_img = tf.reshape(depth_img,[-1,self.dim_image,self.dim_image,n_concat_images])

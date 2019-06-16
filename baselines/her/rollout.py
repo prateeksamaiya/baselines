@@ -39,6 +39,7 @@ class RolloutWorker:
         self.first_collision_history = deque(maxlen=history_len)
         self.reward_history = deque(maxlen=history_len)
         self.max_distance_history = deque(maxlen=history_len)
+        self.max_distance_before_collision_history = deque(maxlen=history_len)
         self.collision_history = deque(maxlen=history_len)
         self.epi_len_history = deque(maxlen=history_len)
         self.Q_history = deque(maxlen=history_len)
@@ -69,6 +70,7 @@ class RolloutWorker:
         obs,rewards,acts, all_collisions = [], [], [], []
         dones = []
         max_distance = 0
+        max_before_collision = 0
         info_values = [np.empty((self.T - 1, self.rollout_batch_size, self.dims['info_' + key]), np.float32) for key in self.info_keys]
         Qs = []
         flag = 1
@@ -104,6 +106,7 @@ class RolloutWorker:
             
             if collision[0] == True and flag:
                 flag = 0
+                max_before_collision = max_distance
                 first_collision = t+1
 
             if any(done):
@@ -145,8 +148,12 @@ class RolloutWorker:
         for key, value in zip(self.info_keys, info_values):
             episode['info_{}'.format(key)] = value[:t]
 
+        if max_before_collision == 0:
+            max_before_collision = max_distance
+
         reward_rate = np.mean(np.array(rewards).sum())
         collision_rate = np.mean(np.array(all_collisions))
+        self.max_distance_before_collision_history.append(max_before_collision)
         self.collision_history.append(collision_rate)
         self.first_collision_history.append(first_collision)
         self.max_distance_history.append(max_distance)
@@ -167,6 +174,7 @@ class RolloutWorker:
         self.Q_history.clear()
         self.reward_history.clear()
         self.max_distance_history.clear()
+        self.max_distance_before_collision_history.clear()
     
     def current_collision_rate(self):
         return np.mean(self.collision_history)
@@ -192,6 +200,7 @@ class RolloutWorker:
         logs += [('episode_length', np.mean(self.epi_len_history))]
         logs += [('reward_rate', np.mean(self.reward_history))]
         logs += [('max_distance', np.mean(self.max_distance_history))]
+        logs += [('max_distance_before_collision', np.mean(self.max_distance_before_collision_history))]
 
         if self.compute_Q:
             logs += [('mean_Q', np.mean(self.Q_history))]

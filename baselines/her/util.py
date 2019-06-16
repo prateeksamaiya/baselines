@@ -66,8 +66,8 @@ def flat_process_input(x,is_rgb,is_depth,is_other,critic_rgb,critic_depth,critic
     x = tf.transpose(x,[0,2,1])
 
     if is_rgb or critic_rgb:
-        flat_obs['rgb'] = tf.reshape(x[:,:flat_image*3,:],[-1,3*n_concat_images*flat_image])
-        x = x[:,flat_image*3:,:]
+        flat_obs['rgb'] = tf.reshape(x[:,:flat_image,:],[-1,1*n_concat_images*flat_image])
+        x = x[:,flat_image:,:]
 
 
     if is_depth or critic_depth:
@@ -91,8 +91,8 @@ def flat_process_input_np(x,is_rgb,is_depth,is_other,critic_rgb,critic_depth,cri
     x = x.transpose([0,2,1])
 
     if is_rgb or critic_rgb:
-        flat_obs['rgb'] = x[:,:flat_image*3,:].reshape([-1,3*n_concat_images*flat_image])
-        x = x[:,flat_image*3:,:]
+        flat_obs['rgb'] = x[:,:flat_image,:].reshape([-1,1*n_concat_images*flat_image])
+        x = x[:,flat_image:,:]
 
 
     if is_depth or critic_depth:
@@ -103,13 +103,13 @@ def flat_process_input_np(x,is_rgb,is_depth,is_other,critic_rgb,critic_depth,cri
 # def flat_process_input_np(x,size=100,n_concat_images=3):
 #     img_len = size*size
 #     real_depth = 4*img_len
-#     size_all_images = 3*real_depth
+#     size_all_images = 1*real_depth
 #     other = x[:,size_all_images:]
 #     x = x[:,:size_all_images]
 #     x = x.reshape([-1,n_concat_images,real_depth])
 #     x = x.transpose([0,2,1])
 #     rgb_image = x[:,:img_len*3,:].reshape([-1,9*img_len])
-#     depth_image = x[:,img_len*3:4*img_len,:].reshape([-1,3*img_len])
+#     depth_image = x[:,img_len*3:4*img_len,:].reshape([-1,1*img_len])
 #     return rgb_image, depth_image, other
 
 def flatten_grads(var_list, grads):

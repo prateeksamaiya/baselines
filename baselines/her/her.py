@@ -137,7 +137,7 @@ def train(*, policy, rollout_worker, evaluator,pred_depth_evaluator,test_eval,re
 
         if is_pred_depth:
             pred_depth_evaluator.clear_history()
-            for _ in range(n__test_rollouts):
+            for _ in range(n_other_test_rollouts):
                 pred_depth_evaluator.generate_rollouts()
 
             for key, val in pred_depth_evaluator.logs('pred_depth_test'):
